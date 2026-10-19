@@ -1,0 +1,6 @@
+verifyDepsBeforeRun: false
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+patchedDependencies:
+  react-pdf@10.2.0: patches/react-pdf@10.2.0.patch

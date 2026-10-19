@@ -1,0 +1,183 @@
+import type { Study } from "./study";
+import { paper } from "./reader-model";
+export type LibraryStudy = Study & { slug: string };
+export const studies: LibraryStudy[] = [
+  { ...paper, slug: "neptune-odyssey" },
+  ...[
+    {
+      id: "ceres-brittle-boulders",
+      slug: "ceres-brittle-boulders",
+      hash: "7c94f3225121bd68511a573467c4b4cb9085fdb28d27f04b457ae137dd8a24e9",
+      title: "The brittle boulders of dwarf planet Ceres",
+      shortTitle: "Ceres’ brittle boulders",
+      subtitle: "Schröder et al. · 2021",
+      url: "/papers/ceres-brittle-boulders.pdf",
+      pageCount: 31,
+      fileName: "ceres-brittle-boulders.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "sedna-trajectories",
+      slug: "sedna-trajectories",
+      hash: "99d1db6de2110f7b674bc179afa640471c637203e2ee88fe79d0a6e8e4881f83",
+      title: "Investigation of Interplanetary Trajectories to Sedna",
+      shortTitle: "Trajectories to Sedna",
+      subtitle: "Brickley et al. · Mission design",
+      url: "/papers/sedna-trajectories.pdf",
+      pageCount: 14,
+      fileName: "sedna-trajectories.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "arxiv-2501.05337",
+      slug: "mars-jezero",
+      hash: "4ee67b83fc74967115ca41f396380311eb37d5361c8443c82a6e2305c7bf9bf3",
+      title:
+        "Martian atmospheric disturbances from orbital images and surface pressure at Jezero Crater, Mars, during Martian Year 36",
+      shortTitle: "Atmospheric disturbances on Mars",
+      subtitle: "Sánchez-Lavega et al. · 2025",
+      url: "/papers/mars-jezero.pdf",
+      pageCount: 39,
+      fileName: "mars-jezero.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "pluto-new-horizons",
+      slug: "pluto-new-horizons",
+      hash: "cfe27bbab91989d9f050b61fdcf2decb8b20fe5c82fa488a63ceb7b247dc277f",
+      title:
+        "The Pluto system: Initial results from its exploration by New Horizons",
+      shortTitle: "New Horizons at Pluto",
+      subtitle: "Stern et al. · 2015",
+      url: "/papers/pluto-new-horizons.pdf",
+      pageCount: 8,
+      fileName: "pluto-new-horizons.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "proxima-centauri",
+      slug: "proxima-centauri",
+      hash: "5779bb9b665a4caffd95454300773ca60283e63c286808f4e891189771c02199",
+      title: "A candidate short-period sub-Earth orbiting Proxima Centauri",
+      shortTitle: "A sub-Earth at Proxima Centauri",
+      subtitle: "Faria et al. · 2022",
+      url: "/papers/proxima-centauri.pdf",
+      pageCount: 17,
+      fileName: "proxima-centauri.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "io-volcanic-activity",
+      slug: "io-volcanic-activity",
+      hash: "23b476f8cc3033a0c4a96dadaf3ee247528e77973f1a4241e116825e03fff6b1",
+      title: "Discovery of Volcanic Activity on Io: A Historical Review",
+      shortTitle: "Discovering Io’s volcanoes",
+      subtitle: "Linda A. Morabito · Historical review",
+      url: "/papers/io-volcanic-activity.pdf",
+      pageCount: 30,
+      fileName: "io-volcanic-activity.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "voyager-plasma-waves",
+      slug: "voyager-plasma-waves",
+      hash: "b57bb4f5d12e2c1589ecaf222cdd84d2ba6c8047fa36b349804656b911b13ddc",
+      title:
+        "Persistent plasma waves in interstellar space detected by Voyager 1",
+      shortTitle: "Voyager’s interstellar plasma waves",
+      subtitle: "Koch Ocker et al. · 2021",
+      url: "/papers/voyager-plasma-waves.pdf",
+      pageCount: 13,
+      fileName: "voyager-plasma-waves.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "voyager-pressure-front",
+      slug: "voyager-pressure-front",
+      hash: "0d7cd830af4d34d49c2fa8ec4632b4ff519ae972c90a3af56a4e91b487c714d6",
+      title:
+        "Magnetic Field and Plasma Density Observations of a Pressure Front by Voyager 1 during 2020 in the Very Local Interstellar Medium",
+      shortTitle: "Voyager’s interstellar pressure front",
+      subtitle: "Burlaga et al. · 2021",
+      url: "/papers/voyager-pressure-front.pdf",
+      pageCount: 9,
+      fileName: "voyager-pressure-front.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "uranus-magnetosphere",
+      slug: "uranus-magnetosphere",
+      hash: "2c512bfa27e48b7d21d4f7d9059501c21a8f8d4aa0e1b9eb940c86c0a11e5dc7",
+      title:
+        "The anomalous state of Uranus’s magnetosphere during the Voyager 2 flyby",
+      shortTitle: "Uranus’s unusual magnetosphere",
+      subtitle: "Jasinski et al. · 2025",
+      url: "/papers/uranus-magnetosphere.pdf",
+      pageCount: 10,
+      fileName: "uranus-magnetosphere.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+    {
+      id: "white-dwarf-colours",
+      slug: "white-dwarf-colours",
+      hash: "2533a4c4e552ca3db7f720f8d14616ba47d239851401ee05aba21f32e8133e7e",
+      title: "Any colour you like: The diverse chromaticities of white dwarfs",
+      shortTitle: "The colours of white dwarfs",
+      subtitle: "Hollands et al. · 2026",
+      url: "/papers/white-dwarf-colours.pdf",
+      pageCount: 32,
+      fileName: "white-dwarf-colours.pdf",
+      sections: [
+        {
+          title: "Paper",
+          page: 1,
+        },
+      ],
+    },
+  ],
+];

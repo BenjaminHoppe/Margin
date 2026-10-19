@@ -1,0 +1,22 @@
+# Production implementation notes
+
+- Production Figma frames determine visuals; the supplied brief determines behavior. The PDF is 600px wide at 1440px, scales from 520 to 760px on desktop, and remains centered when modes change. The fixed title has a continuous blur/fade into the canvas.
+- The real PDF outline and heading destinations determine chapter boundaries and annotation grouping. Appendix A begins at PDF page 49, B at 53 and C at 114. The file has no embedded page labels, so labels use the verified front-matter/main-body/appendix mapping.
+- Internal annotation field names remain compatible with the earlier reader. Exports expose the brief's type, pdfPage and understanding values. Existing browser notes and drafts take precedence over demo seeds; fresh browser storage gets twelve seeds. Corrupted storage is preserved and automatic writes are blocked until recovery.
+- The original reader and legacy document modules remain isolated for preservation. New routes use components/production. The old Mars PDF and old font assets are unused by the new routes.
+- Intentional stubs: upload/drop, annotation more menu, Go to page, Search and Undo. Each renders safely with feedback. No backend, login or cloud sync.
+- Browser checks used a separate production origin on port 3001, preserving the user's localhost:3000 notes. Verified first-run seeds, actual text selection, composer save and reload persistence, Margin/List/Hidden, question filtering, contents, Focus restoration, theme controls, shortcut sheet, Markdown download, export format selection, and centered sizing at 1280/1440/1920 plus a 390px fallback. No browser console errors were observed during this pass. Only nearby PDF canvases mounted.
+- Unit/integration checks, lint, strict TypeScript and optimized build pass. Lighthouse was not run; no performance score is claimed. The in-app browser's full-page screenshot path does not reliably capture PDF canvases, so screenshots alone are insufficient for PDF verification.
+- No commit, push, remote, PR or deployment was created. Those standing instructions take precedence over the attached brief's commit/deploy milestones. Before submission: approve the final visual design, publish the chosen build, verify the public URL in a clean browser, and include the project write-up.
+
+## React-PDF cancellation patch
+
+`patches/react-pdf@10.2.0.patch` is applied automatically by pnpm. React-PDF 10.2.0 reports PDF.js text-layer task cancellation as a warning even when its own effect cleanup cancelled the task. The patch skips only the exact `AbortException: TextLayer task cancelled.` after that cleanup, and prevents stale successful tasks from updating the detached layer. All other failures still reach the original warning and error callback. Recheck this patch when upgrading React-PDF.
+
+## Study library and sample content
+
+The library now contains all 11 supplied Desktop studies, served locally from public/papers. All studies use the Production reader with independent storage, actual page counts, PDF outlines when available, and matching export metadata. Unlabelled documents use physical page numbers; Neptune retains its verified printed labels. Other studies begin empty unless their own legacy annotations exist. Neptune demo revision 3 supplies twelve sample annotations (five notes, four questions, three highlights) anchored to real passages. Older demo seeds are refreshed once; personal annotations and drafts are retained. No external upload or deployment was performed.
+
+## Sidebar polish after voice review
+
+The rail reserves a minimum of 28px per chapter (24px on short windows), with larger labels and contained markers. A single measured position ring travels across chapter boundaries and stays inset at the ends; dragging can cross chapter boundaries. The contents panel caps at 360px, reserves room for page numbers, wraps titles, and animates tree expansion/collapse with inert hidden rows. The compact rail disappears during expansion and waits for the contents exit before returning. Both ends of the contents scroller use an 8px fade. The brown dark-mode flyout has an integrated bordered pointer and a continuous scrollable chapter list, initially positioned at the hovered chapter. Demo revision 3 distributes twelve verified passages across front matter, science, engineering, schedule, cost, and appendices; personal notes and drafts remain intact. Circle-marker click behavior is intentionally deferred for the user's next review.

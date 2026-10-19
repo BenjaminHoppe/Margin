@@ -1,0 +1,253 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import {
+  initialReaderState,
+  pageLabel,
+  readReaderState,
+  READER_KEY,
+  seedAnnotations,
+  fallbackSections,
+  chaptersFromOutline,
+  paper,
+  sectionForAnnotation,
+  readerKey,
+} from "../src/lib/reader-model";
+import { studies } from "../src/lib/catalog";
+import { exportAnnotations } from "../src/lib/reader-export";
+import { locateQuote, normalizedQuote } from "../src/lib/quote-match";
+
+test("new reader starts at printed page 8 with a complete seeded workflow", () => {
+  const state = initialReaderState();
+  assert.equal(state.position.page, 19);
+  assert.equal(pageLabel(19), "8");
+  assert.equal(state.annotations.length, 12);
+  const chapters = chaptersFromOutline(fallbackSections);
+  const populated = chapters.filter((c) =>
+    state.annotations.some((a) => a.page >= c.start && a.page <= c.end),
+  );
+  assert.ok(populated.length >= 6, "demo content should span the study");
+  assert.equal(state.active, "seed-5");
+  assert.equal(state.mode, "margin");
+});
+test("existing notes migrate without replacing the legacy data", () => {
+  const annotation = {
+    ...seedAnnotations()[0],
+    id: "my-note",
+    body: "My existing note",
+  };
+  const writes: string[] = [];
+  const storage = {
+    getItem(key: string) {
+      if (key === `margin:${paper.id}:v1`)
+        return JSON.stringify({ annotations: [annotation], page: 20 });
+      writes.push(key);
+      return null;
+    },
+  };
+  const result = readReaderState(storage);
+  assert.equal(
+    result.state.annotations.find((a) => a.id === "my-note")?.body,
+    "My existing note",
+  );
+  assert.equal(result.state.annotations.length, 13);
+  assert.equal(result.state.position.page, 20);
+  assert.ok(writes.includes(READER_KEY));
+});
+test("an intentionally empty saved paper stays empty", () => {
+  const state = { ...initialReaderState(), annotations: [] };
+  assert.deepEqual(
+    readReaderState({
+      getItem: (key) => (key === READER_KEY ? JSON.stringify(state) : null),
+    }).state.annotations,
+    [],
+  );
+});
+test("corrupt storage is reported and never overwritten by the reader", () => {
+  const result = readReaderState({ getItem: () => "{corrupt" });
+  assert.ok(result.error.includes("preserved"));
+});
+test("chapter boundaries cover each real PDF page exactly once", () => {
+  const chapters = chaptersFromOutline(fallbackSections);
+  assert.equal(chapters.length, 9);
+  assert.equal(chapters.find((c) => c.id === "B")?.start, 53);
+  assert.equal(chapters.find((c) => c.id === "B")?.end, 113);
+  assert.deepEqual(
+    chapters.flatMap((c) =>
+      Array.from({ length: c.end - c.start + 1 }, (_, i) => i + c.start),
+    ),
+    Array.from({ length: 116 }, (_, i) => i + 1),
+  );
+  assert.equal(pageLabel(49), "A-1");
+  assert.equal(pageLabel(114), "C-1");
+});
+test("exports include sections, printed labels and question status, with optional quotes", () => {
+  const seed = seedAnnotations();
+  const json = JSON.parse(
+    exportAnnotations(seed, "json", false, fallbackSections),
+  );
+  const question = json.find((row: { id: string }) => row.id === "seed-5");
+  assert.equal(question.page, "8");
+  assert.equal(question.status, "open");
+  assert.equal("quote" in question, false);
+  const md = exportAnnotations(
+    seed,
+    "md",
+    true,
+    fallbackSections,
+    null,
+    new Date("2026-10-19T00:00:00Z"),
+  );
+  assert.match(md, /Triton as an Ocean World · p\. 8/);
+  assert.match(md, /Status: open/);
+  assert.match(md, /Exported from Margin · 2026-10-19/);
+  const csv = exportAnnotations(
+    [{ ...seed[0], body: 'A "quote", and\na newline' }],
+    "csv",
+    true,
+    fallbackSections,
+  );
+  assert.match(csv, /"A ""quote"", and\na newline"/);
+});
+test("quote normalization handles typography, line breaks and footnotes", () => {
+  assert.equal(
+    normalizedQuote("charac-\nterize Neptune’s ¹ field"),
+    normalizedQuote("characterize Neptune's field"),
+  );
+  assert.equal(normalizedQuote("ﬁeld"), normalizedQuote("field"));
+});
+test("all twelve seed passages resolve to valid coordinates in the supplied PDF", async () => {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdf = await getDocument({
+    data: new Uint8Array(
+      await readFile(
+        new URL("../public/papers/neptune-odyssey.pdf", import.meta.url),
+      ),
+    ),
+    useSystemFonts: true,
+  }).promise;
+  try {
+    for (const annotation of seedAnnotations()) {
+      const page = await pdf.getPage(annotation.page);
+      const viewport = page.getViewport({ scale: 1 });
+      const text = await page.getTextContent();
+      const rects = locateQuote(
+        text.items.filter((item) => "str" in item),
+        annotation.quote,
+        viewport.width,
+        viewport.height,
+      );
+      assert.ok(rects.length, annotation.id);
+      assert.ok(
+        rects.every(
+          (r) =>
+            r.x >= 0 &&
+            r.y >= 0 &&
+            r.width > 0 &&
+            r.height > 0 &&
+            r.x + r.width <= 1 &&
+            r.y + r.height <= 1,
+        ),
+      );
+    }
+    const page = await pdf.getPage(19);
+    const text = await page.getTextContent();
+    assert.deepEqual(
+      locateQuote(
+        text.items.filter((item) => "str" in item),
+        "This passage does not exist in this document",
+        612,
+        792,
+      ),
+      [],
+    );
+  } finally {
+    await pdf.destroy();
+  }
+});
+
+test("section grouping uses heading positions within the same PDF page", () => {
+  const sections = [
+    { title: "Ocean world", page: 19, y: 0.1 },
+    { title: "Comparative planetology", page: 20, y: 0.3 },
+    { title: "Small satellites", page: 20, y: 0.6 },
+  ];
+  const annotation = {
+    ...seedAnnotations()[5],
+    rects: [{ x: 0.1, y: 0.2, width: 0.5, height: 0.02 }],
+  };
+  assert.equal(sectionForAnnotation(annotation, sections).title, "Ocean world");
+  assert.equal(
+    sectionForAnnotation(
+      { ...annotation, rects: [{ ...annotation.rects[0], y: 0.4 }] },
+      sections,
+    ).title,
+    "Comparative planetology",
+  );
+});
+test("malformed saved drafts preserve the original storage for recovery", () => {
+  const state = { ...initialReaderState(), draft: { body: "Unsaved text" } };
+  const result = readReaderState({ getItem: () => JSON.stringify(state) });
+  assert.match(result.error, /preserved/);
+});
+
+test("each additional study starts empty and uses independent storage and page limits", () => {
+  for (const study of studies.slice(1)) {
+    const state = readReaderState({ getItem: () => null }, study).state;
+    assert.equal(state.annotations.length, 0);
+    assert.equal(state.position.page, 1);
+    assert.notEqual(readerKey(study), READER_KEY);
+    const sections = [{ title: "Paper", page: 1 }];
+    assert.equal(
+      chaptersFromOutline(sections, study.pageCount, false)[0].end,
+      study.pageCount,
+    );
+    const output = exportAnnotations(
+      [],
+      "md",
+      true,
+      sections,
+      null,
+      new Date(),
+      study,
+    );
+    assert.ok(output.startsWith(`# ${study.title}`));
+  }
+});
+test("the new demo is added once while preserving personal annotations and drafts", () => {
+  const note = {
+    ...seedAnnotations()[0],
+    id: "personal",
+    body: "Keep my own words",
+  };
+  const old = {
+    ...initialReaderState(),
+    demoSeedVersion: 2,
+    annotations: [seedAnnotations()[0], note],
+    draft: { ...note },
+  };
+  const first = readReaderState({
+    getItem: (key) => (key === READER_KEY ? JSON.stringify(old) : null),
+  }).state;
+  assert.equal(first.annotations.length, 13);
+  assert.equal(first.demoSeedVersion, 3);
+  assert.equal(first.draft?.body, note.body);
+  const second = readReaderState({
+    getItem: (key) => (key === READER_KEY ? JSON.stringify(first) : null),
+  }).state;
+  assert.deepEqual(second.annotations, first.annotations);
+});
+test("all library PDFs exist with the catalogued page counts", async () => {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  assert.equal(studies.length, 11);
+  assert.equal(new Set(studies.map((s) => s.slug)).size, studies.length);
+  for (const study of studies) {
+    const pdf = await getDocument({
+      data: new Uint8Array(
+        await readFile(new URL(`../public${study.url}`, import.meta.url)),
+      ),
+    }).promise;
+    assert.equal(pdf.numPages, study.pageCount, study.title);
+    await pdf.destroy();
+  }
+});

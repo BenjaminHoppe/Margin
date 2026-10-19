@@ -1,0 +1,36 @@
+diff --git a/dist/Page/TextLayer.js b/dist/Page/TextLayer.js
+index 613ec3afa0d6ea5c2fd9199814e053da82207f1d..98f6134f30a4f8f3a5ccac4c884dc25a76710039 100644
+--- a/dist/Page/TextLayer.js
++++ b/dist/Page/TextLayer.js
+@@ -125,9 +125,11 @@ export default function TextLayer() {
+         };
+         const cancellable = new pdfjs.TextLayer(parameters);
+         const runningTask = cancellable;
++        let cancelledByCleanup = false;
+         cancellable
+             .render()
+             .then(() => {
++            if (cancelledByCleanup) return;
+             const end = document.createElement('div');
+             end.className = 'endOfContent';
+             layer.append(end);
+@@ -155,8 +157,17 @@ export default function TextLayer() {
+             // Intentional immediate callback
+             onRenderSuccess();
+         })
+-            .catch(onRenderError);
+-        return () => cancelRunningTask(runningTask);
++            .catch((error) => {
++            // Virtualization, resizing and Strict Mode may cancel our own task.
++            // Preserve reporting for every other failure, including live aborts.
++            if (cancelledByCleanup && error?.name === 'AbortException' &&
++                error.message === 'TextLayer task cancelled.') return;
++            onRenderError(error);
++        });
++        return () => {
++            cancelledByCleanup = true;
++            cancelRunningTask(runningTask);
++        };
+     }, [
+         customTextRenderer,
+         onRenderError,

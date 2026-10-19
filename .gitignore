@@ -1,0 +1,12 @@
+node_modules/
+.next/
+public/pdfjs/
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+test-results/
+playwright-report/
+.DS_Store
+# Personal, non-commercial font; do not distribute the font software.
+src/app/fonts/WagramNonCommercial-Regular.otf
