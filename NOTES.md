@@ -40,3 +40,27 @@ Parent rows retain annotation summaries in both expanded and collapsed states, k
 ## Preview card interaction
 
 Single hover cards have no extra outer surface; multiple cards share the scrollable container. The originating marker stays highlighted throughout marker/preview hover. Preview cards use a dedicated sidebar-opening action: select the annotation and scroll directly to its passage while preserving the annotation display mode, including Hidden. The sidebar destination is held active during the jump so it does not flash through ancestor sections. Card clicks do not toggle section rows. Paper scrolling does not dismiss the preview; scrolling its source sidebar does. Marker clicks themselves remain hover-only.
+
+## Collapsed minimap parity pass
+
+The compact rail uses 13px medium labels, 4px rounded tracks, 8px chapter gaps, and a centered 16×20px position indicator. Active, read, and unread colors follow the expanded sidebar; the selected chapter remains stable during navigation while the position indicator continues to track actual scrolling.
+
+Chapter flyouts retain Wagram for their large title, with 13px medium full-wrap rows, 12px page labels, 8px nesting, 4px row gaps, and 12px container padding. Same-page heading positions determine completed rows. Flyouts grow within the viewport with 24px bottom clearance; the integrated pointer stays clear of rounded corners. Appendix headers identify themselves as appendices.
+
+Flyout annotation markers reuse the expanded view’s ordered, clickable previews, single-card and multi-card surfaces, persistent source hover, and Hidden-mode preservation. Moving into a preview keeps the chapter flyout open. Row clicks navigate without immediately dismissing the flyout. Browser inspection remains with the user; TypeScript, lint, and the 27-test regression suite were checked locally.
+
+## Minimap handle and track insets
+
+The position handle is now a directly draggable, keyboard-operable slider with grab/grabbing feedback, a larger invisible hit area, and pickup-offset preservation. Arrow keys move one page, Page Up/Down five, and Home/End reach the document ends. Chapter tracks and their annotation marker lanes have 8px top/bottom insets; minimum chapter height is 36px so the contained 20px handle fits. Short windows use 4px insets and 28px minimum segments. The source track determines scrubbing coordinates.
+
+## Minimap scaling
+
+The compact rail now allocates chapter heights proportionally to PDF page counts using a zero flex basis, with the existing minimum height as a readability floor. It no longer adds the same fixed height before distributing proportional space. The expanded sidebar remains content-height driven. The draggable position handle is currently hidden at the user’s preference; tracks and click/drag navigation remain.
+
+## Shared chapter flyout motion
+
+The chapter flyout keeps a single outer shell while switching chapters. Natural chapter content determines its measured, viewport-bounded height; the shell and integrated pointer transition their position and height together, while chapter content fades in briefly. The inner scroll resets for each newly hovered chapter. A ResizeObserver watches natural content rather than the animated shell, avoiding per-frame measurement loops. Reduced-motion preferences disable these effects.
+
+## Floating chapter panel
+
+The triangular pointer and experimental SVG border were removed at the user’s request. Flyouts retain their existing color values and use the original CSS surface, border, and rounded corners. The single floating shell still animates its position and content-driven height; the originating rail highlight indicates its section.

@@ -759,16 +759,17 @@ kbd {
   width: 64px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
   height: 100%;
-  padding: 10px 0;
+  padding: 8px 0;
 }
 .chapter-segment {
+  --chapter-inset: 8px;
   display: block;
   position: relative;
   width: 64px;
-  min-height: 28px;
-  flex-basis: 28px;
+  min-height: 36px;
+  flex-basis: 0;
   flex-shrink: 0;
   touch-action: none;
   border-radius: 7px;
@@ -777,11 +778,12 @@ kbd {
 .chapter-label {
   position: absolute;
   left: 4px;
-  top: 5px;
+  top: var(--chapter-inset);
   font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--faint);
-  line-height: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 20px;
 }
 .chapter-segment.current .chapter-label {
   color: var(--text);
@@ -789,11 +791,11 @@ kbd {
 }
 .chapter-track {
   position: absolute;
-  left: 30px;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  border-radius: 3px;
+  left: 32px;
+  top: var(--chapter-inset);
+  bottom: var(--chapter-inset);
+  width: 4px;
+  border-radius: 4px;
   background: var(--seg-unread);
 }
 /* Keep even the first pixel of progress inside the rounded track. */
@@ -862,20 +864,20 @@ kbd {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  left: 38px;
+  left: 44px;
   background: var(--signal);
   transform: translateY(-50%);
   pointer-events: none;
 }
 .rail-marker.highlight {
-  left: 30px;
-  width: 5px;
+  left: 32px;
+  width: 4px;
   height: 11px;
   border-radius: 2px;
 }
 .rail-understanding {
   position: absolute;
-  left: 47px;
+  left: 56px;
   width: 6px;
   height: 6px;
   border-radius: 2px;
@@ -883,12 +885,12 @@ kbd {
 }
 .navigation-footer {
   position: fixed;
-  left: 36.5px;
+  left: 38px;
   bottom: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 17px;
+  gap: 16px;
   z-index: 23;
 }
 .navigation-footer > span {
@@ -900,47 +902,53 @@ kbd {
   height: 32px;
 }
 .section-flyout {
-  border: 1px solid transparent;
+  --flyout-surface: var(--toolbar);
+  --flyout-border: transparent;
+  border: 1px solid var(--flyout-border);
   pointer-events: auto;
   position: fixed;
   left: 94px;
   width: 320px;
   max-width: calc(100vw - 102px);
-  max-height: min(480px, calc(100dvh - var(--flyout-top, 80px) - 24px));
+  max-height: calc(100dvh - var(--flyout-top, 80px) - 24px);
   display: flex;
   flex-direction: column;
-  padding: 16px 10px 12px;
+  padding: 4px;
   border-radius: 16px;
-  background: var(--toolbar);
+  --flyout-row-current: #ffffff17;
+  --flyout-row-hover: #ffffff0d;
+  background: var(--flyout-surface);
   color: var(--flyout-text);
   box-shadow: var(--e3);
   animation: menu-in 150ms var(--ease);
+  box-sizing: border-box;
+  transition:
+    top 180ms var(--ease),
+    height 180ms var(--ease);
 }
 :root[data-theme="dark"] .section-flyout {
-  border-color: var(--border);
-  background: var(--surface);
-}
-.section-flyout::before {
-  pointer-events: none;
-  content: "";
-  position: absolute;
-  left: -6px;
-  top: 30px;
-  width: 12px;
-  height: 12px;
-  transform: rotate(45deg);
-  background: inherit;
-  border-left: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  --flyout-border: var(--border);
+  --flyout-surface: var(--surface);
+  --flyout-row-current: var(--current-row);
+  --flyout-row-hover: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .flyout-scroll {
   position: relative;
   min-height: 0;
+  padding: 12px 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  overflow-anchor: none;
   scrollbar-width: thin;
-  scrollbar-color: var(--flyout-faint) transparent;
+  scrollbar-color: var(--flyout-muted) transparent;
+  scrollbar-gutter: stable;
+  mask-image: linear-gradient(
+    transparent,
+    black 8px,
+    black calc(100% - 8px),
+    transparent
+  );
 }
 .section-flyout header,
 .section-flyout h2 {
@@ -950,18 +958,22 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 6px;
-  color: var(--flyout-faint);
-  font: 11px var(--font-mono);
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 0 8px;
+  color: var(--flyout-muted);
+  font: 12px/20px var(--font-mono);
 }
 .section-flyout .eyebrow {
   color: inherit;
-  font-size: 11px;
+  font-size: 13px;
+  text-transform: none;
 }
 .section-flyout h2 {
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 24px;
   color: var(--toolbar-text);
-  padding: 6px 6px 10px;
+  padding: 8px 8px 12px;
 }
 .flyout-row {
   display: flex;
@@ -969,34 +981,40 @@ kbd {
   gap: 8px;
   position: relative;
   text-align: left;
-  padding: 10px 10px 10px calc(10px + var(--depth, 0) * 14px);
-  border-radius: 10px;
+  padding: 12px 8px 12px calc(8px + var(--depth, 0) * 8px);
+  border-radius: 12px;
   width: 100%;
-  font-size: 12.5px;
+  min-height: 44px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 18px;
   color: var(--flyout-text);
 }
 .flyout-row > span:first-child {
   flex: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.flyout-row:last-child {
+  margin-bottom: 0;
 }
 .flyout-row.read {
   color: var(--flyout-muted);
 }
 .flyout-row small {
-  font: 12px var(--font-mono);
-  min-width: 16px;
+  font: 12px/20px var(--font-mono);
+  flex-shrink: 0;
   text-align: right;
-  color: var(--flyout-faint);
+  color: var(--flyout-muted);
   padding-top: 0;
 }
 .flyout-row.current {
-  background: #ffffff17;
+  background: var(--flyout-row-current);
   color: var(--toolbar-text);
-  font-weight: 500;
+}
+.flyout-row.current small {
+  color: var(--toolbar-text);
 }
 .row-signals {
   display: inline-flex;
@@ -1962,7 +1980,8 @@ kbd {
   .card-more:hover {
     background: var(--surface-2);
   }
-  .chapter-segment:hover::before {
+  .chapter-segment:hover::before,
+  .chapter-segment[data-flyout-open="true"]::before {
     background: color-mix(in srgb, var(--text) 5%, transparent);
   }
   .contents-row:not(.current):hover {
@@ -1971,8 +1990,8 @@ kbd {
   .contents-jump:hover {
     color: var(--text);
   }
-  .flyout-row:hover {
-    background: #ffffff17;
+  .flyout-row:not(.current):hover {
+    background: var(--flyout-row-hover);
   }
   .list-row:hover {
     background: var(--surface-2);
@@ -2359,8 +2378,11 @@ button:not(.chapter-segment):not(.range-tick),
   width: min(360px, calc((100vw - var(--page-width)) / 2 - 42px));
 }
 .rail-position {
-  left: 25px;
+  left: 26px;
   top: 0;
+  width: 16px;
+  height: 20px;
+  border-radius: 8px;
 }
 .chapter-segment {
   isolation: isolate;
@@ -2368,18 +2390,15 @@ button:not(.chapter-segment):not(.range-tick),
 .chapter-segment::before {
   content: "";
   position: absolute;
-  inset: -3px -2px;
-  border-radius: 10px;
+  inset: 0 -2px;
+  border-radius: 12px;
   z-index: -1;
   pointer-events: none;
   transition: background-color 120ms ease;
 }
 .flyout-chapter {
-  padding-bottom: 2px;
-}
-.flyout-row.current {
-  box-shadow: inset 2px 0 0
-    color-mix(in srgb, var(--toolbar-text) 65%, transparent);
+  padding-bottom: 0;
+  animation: annotation-preview-in 120ms ease-out;
 }
 .section-flyout h2 {
   font-family: var(--font-editorial);
@@ -2442,8 +2461,9 @@ button:not(.chapter-segment):not(.range-tick),
     padding: 0;
   }
   .chapter-segment {
-    min-height: 24px;
-    flex-basis: 24px;
+    --chapter-inset: 4px;
+    min-height: 28px;
+    flex-basis: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2659,4 +2679,72 @@ a[href] * {
 .navigation-toggle-state[data-visible="true"] {
   opacity: 1;
   transform: translateX(0);
+}
+
+.chapter-segment.current::before {
+  background: var(--current-row);
+}
+.chapter-segment.current .chapter-track {
+  background: var(--seg-active-empty);
+}
+.chapter-track {
+  transition: background-color 120ms ease;
+}
+.flyout-row .row-signals:not(:empty) {
+  margin-right: 0;
+}
+.flyout-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.flyout-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--toolbar-text) 25%, transparent);
+  border-radius: 4px;
+}
+.flyout-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.document-navigation .rail-position {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.document-navigation .rail-position::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 12px;
+}
+@media (hover: hover) {
+  .document-navigation .rail-position:hover {
+    background: color-mix(in srgb, var(--text) 20%, var(--surface));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 8%, transparent);
+  }
+}
+.document-navigation .rail-position[data-grabbed="true"] {
+  cursor: grabbing;
+  background: color-mix(in srgb, var(--text) 28%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 12%, transparent);
+}
+.document-navigation .minimap-rail[data-grabbed="true"],
+.document-navigation .minimap-rail[data-grabbed="true"] * {
+  cursor: grabbing;
+}
+
+.chapter-markers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--chapter-inset);
+  bottom: var(--chapter-inset);
+  pointer-events: none;
+}
+
+/* Temporarily hidden for the user's minimap comparison. */
+.document-navigation .rail-position {
+  display: none;
 }

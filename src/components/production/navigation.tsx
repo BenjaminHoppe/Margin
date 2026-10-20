@@ -30,12 +30,16 @@ function RowSignals({
   preview = false,
   labels = null,
   onOpen,
+  onPreviewEnter,
+  onPreviewLeave,
 }: {
   annotations: Annotation[];
   show: ShowOnPage;
   preview?: boolean;
   labels?: string[] | null;
   onOpen?: (annotation: Annotation) => void;
+  onPreviewEnter?: () => void;
+  onPreviewLeave?: () => void;
 }) {
   const [hover, setHover] = useState<{
     kind: Annotation["kind"];
@@ -106,6 +110,7 @@ function RowSignals({
             onMouseEnter={
               preview
                 ? (event) => {
+                    onPreviewEnter?.();
                     if (timer.current) clearTimeout(timer.current);
                     const rect = event.currentTarget.getBoundingClientRect();
                     const left =
@@ -150,9 +155,17 @@ function RowSignals({
               maxHeight: `calc(100dvh - ${hover.top + 24}px)`,
             }}
             onMouseEnter={() => {
+              onPreviewEnter?.();
               if (timer.current) clearTimeout(timer.current);
             }}
-            onMouseLeave={leavePreview}
+            onMouseLeave={() => {
+              leavePreview();
+              onPreviewLeave?.();
+            }}
+            onFocus={() => {
+              onPreviewEnter?.();
+              if (timer.current) clearTimeout(timer.current);
+            }}
             onClick={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
           >
@@ -206,9 +219,11 @@ export function Navigation({
     () => chaptersFromOutline(sections, pageCount, neptune),
     [sections, pageCount, neptune],
   );
-  const [hover, setHover] = useState<{ chapter: Chapter; top: number } | null>(
-    null,
-  );
+  const [hover, setHover] = useState<{
+    chapter: Chapter;
+    top: number;
+  } | null>(null);
+  const flyout = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(["1. Scientific Objectives", "Science Closure"]),
   );
@@ -254,6 +269,8 @@ export function Navigation({
     readingPosition.current = page + fraction;
     updateContentsFill();
   }, [page, fraction, updateContentsFill]);
+  const [grabbed, setGrabbed] = useState(false);
+  const grabOffset = useRef(0);
   const pointerStart = useRef<number | null>(null);
   const dragging = useRef(false);
   // One indicator travels across chapter boundaries instead of remounting in each segment.
@@ -261,7 +278,7 @@ export function Navigation({
     if (mode !== "map" || focus) return;
     const update = () => {
       const track = rail.current?.querySelector<HTMLElement>(
-        ".chapter-segment.current .chapter-track",
+        '.chapter-segment[data-reading="true"] .chapter-track',
       );
       const ring = indicator.current;
       if (!track || !ring || !rail.current) return;
@@ -283,7 +300,7 @@ export function Navigation({
           10,
           Math.min(track.clientHeight - 10, position * track.clientHeight),
         );
-      ring.style.transform = `translateY(${y - 9}px)`;
+      ring.style.transform = `translateY(${y - 10}px)`;
     };
     update();
     const observer = new ResizeObserver(update);
@@ -339,6 +356,32 @@ export function Navigation({
       .forEach((item) => observer.observe(item));
     return () => observer.disconnect();
   }, [sections, pageCount, expanded, mode, focus, updateContentsFill]);
+  useLayoutEffect(() => {
+    const panel = flyout.current;
+    const scroller = panel?.querySelector<HTMLElement>(".flyout-scroll");
+    const content = scroller?.querySelector<HTMLElement>(".flyout-chapter");
+    if (!hover || !panel || !scroller || !content || mode !== "map") return;
+    // Keep one floating shell and measure natural content so shorter chapters
+    // can shrink after long ones without changing the text layout.
+    const measure = () => {
+      const panelStyle = getComputedStyle(panel);
+      const scrollStyle = getComputedStyle(scroller);
+      const extra = [
+        panelStyle.paddingTop,
+        panelStyle.paddingBottom,
+        panelStyle.borderTopWidth,
+        panelStyle.borderBottomWidth,
+        scrollStyle.paddingTop,
+        scrollStyle.paddingBottom,
+      ].reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
+      panel.style.height = `${Math.min(content.getBoundingClientRect().height + extra, innerHeight - hover.top - 24)}px`;
+    };
+    scroller.scrollTop = 0;
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [hover, mode]);
   function scrub(clientY: number, smooth: boolean) {
     const elements =
       rail.current?.querySelectorAll<HTMLElement>(".chapter-segment");
@@ -347,15 +390,27 @@ export function Navigation({
       (el) => clientY <= el.getBoundingClientRect().bottom,
     );
     if (index < 0) index = elements.length - 1;
-    const r = elements[index].getBoundingClientRect();
+    const r = (
+      elements[index].querySelector<HTMLElement>(".chapter-track") ??
+      elements[index]
+    ).getBoundingClientRect();
     const chapter = chapters[index];
     const value =
       Math.max(0, Math.min(0.9999, (clientY - r.top) / r.height)) *
       (chapter.end - chapter.start + 1);
-    onJump(chapter.start + Math.floor(value), value % 1, smooth);
+    const targetPage = chapter.start + Math.floor(value);
+    setDestination(sectionForPosition(targetPage, value % 1, sections));
+    onJump(targetPage, value % 1, smooth);
   }
   const progress = Math.round(((page - 1 + fraction) / pageCount) * 100);
-  const current = sectionForPosition(page, fraction, sections);
+  const current =
+    destination &&
+    (animateProgress ||
+      Math.abs(page + fraction - destination.page - (destination.y ?? 0)) <
+        0.001)
+      ? destination
+      : sectionForPosition(page, fraction, sections);
+  const activePage = animateProgress && destination ? destination.page : page;
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -364,9 +419,25 @@ export function Navigation({
   useEffect(() => {
     const close = (e: KeyboardEvent) => {
       if (e.key === "Escape") setHover(null);
+      if (
+        [
+          "ArrowLeft",
+          "ArrowRight",
+          "PageUp",
+          "PageDown",
+          "Home",
+          "End",
+        ].includes(e.key)
+      )
+        setDestination(null);
     };
+    const resize = () => setHover(null);
     window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    window.addEventListener("resize", resize);
+    return () => {
+      window.removeEventListener("keydown", close);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
   function keep() {
     if (timer.current) clearTimeout(timer.current);
@@ -377,12 +448,10 @@ export function Navigation({
   }
   function reveal(chapter: Chapter, el: HTMLElement) {
     keep();
+    const rect = el.getBoundingClientRect();
     setHover({
       chapter,
-      top: Math.max(
-        80,
-        Math.min(innerHeight - 504, el.getBoundingClientRect().top - 18),
-      ),
+      top: Math.max(24, Math.min(innerHeight - 320, rect.top - 16)),
     });
   }
   const rows = sections.filter((s, index) => {
@@ -422,22 +491,33 @@ export function Navigation({
         onMouseEnter={keep}
         onMouseLeave={leave}
       >
-        <div className="minimap-rail" ref={rail} inert={mode !== "map"}>
+        <div
+          className="minimap-rail"
+          ref={rail}
+          inert={mode !== "map"}
+          data-grabbed={grabbed}
+        >
           {chapters.map((chapter, index) => {
             const count = chapter.end - chapter.start + 1;
             const position = Math.max(
               0,
               Math.min(1, (page - chapter.start + fraction) / count),
             );
-            const isCurrent = page >= chapter.start && page <= chapter.end;
+            const isReading = page >= chapter.start && page <= chapter.end;
+            const isCurrent =
+              activePage >= chapter.start && activePage <= chapter.end;
             return (
               <button
                 key={chapter.id}
                 className={`chapter-segment ${isCurrent ? "current" : ""}`}
+                data-reading={isReading}
+                data-flyout-open={hover?.chapter.id === chapter.id}
                 style={{ flexGrow: count } as CSSProperties}
                 aria-label={`${chapter.title}, pages ${pageLabel(chapter.start, labels)} to ${pageLabel(chapter.end, labels)}`}
                 aria-current={isCurrent ? "location" : undefined}
-                onMouseEnter={(e) => reveal(chapter, e.currentTarget)}
+                onMouseEnter={(e) => {
+                  if (!grabbed) reveal(chapter, e.currentTarget);
+                }}
                 onFocus={(e) => reveal(chapter, e.currentTarget)}
                 onBlur={(e) => {
                   if (
@@ -474,7 +554,12 @@ export function Navigation({
                   pointerStart.current = null;
                 }}
                 onClick={(e) => {
-                  if (e.detail === 0) onJump(chapter.start);
+                  if (e.detail === 0) {
+                    setDestination(
+                      sectionForPosition(chapter.start, 0, sections),
+                    );
+                    onJump(chapter.start);
+                  }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -489,14 +574,14 @@ export function Navigation({
                       ]?.focus();
                   }
                 }}
-                onWheel={(e) =>
-                  onJump(
-                    Math.max(
-                      1,
-                      Math.min(pageCount, page + (e.deltaY > 0 ? 1 : -1)),
-                    ),
-                  )
-                }
+                onWheel={(e) => {
+                  const target = Math.max(
+                    1,
+                    Math.min(pageCount, page + (e.deltaY > 0 ? 1 : -1)),
+                  );
+                  setDestination(sectionForPosition(target, 0, sections));
+                  onJump(target);
+                }}
               >
                 <span className="chapter-label">{chapter.id}</span>
                 <span className="chapter-track">
@@ -507,47 +592,134 @@ export function Navigation({
                     }}
                   />
                 </span>
-                {annotations
-                  .filter(
-                    (a) =>
-                      a.page >= chapter.start &&
-                      a.page <= chapter.end &&
-                      show[a.kind],
-                  )
-                  .map((a) => (
-                    <span
-                      key={a.id}
-                      className={`rail-marker ${a.kind}`}
-                      style={{
-                        top: `clamp(7px, ${((a.page - chapter.start + (a.rects[0]?.y ?? 0.5)) / count) * 100}%, calc(100% - 7px))`,
-                      }}
-                    />
-                  ))}
-                {show.understanding &&
-                  annotations
+                <span className="chapter-markers" aria-hidden="true">
+                  {annotations
                     .filter(
                       (a) =>
                         a.page >= chapter.start &&
                         a.page <= chapter.end &&
-                        a.understanding !== "unmarked" &&
                         show[a.kind],
                     )
                     .map((a) => (
                       <span
-                        key={`u-${a.id}`}
-                        className={`rail-understanding understanding-dot ${a.understanding.replaceAll(" ", "-")}`}
+                        key={a.id}
+                        className={`rail-marker ${a.kind}`}
                         style={{
-                          top: `clamp(7px, ${((a.page - chapter.start + 0.5) / count) * 100}%, calc(100% - 7px))`,
+                          top: `clamp(7px, ${((a.page - chapter.start + (a.rects[0]?.y ?? 0.5)) / count) * 100}%, calc(100% - 7px))`,
                         }}
                       />
                     ))}
+                  {show.understanding &&
+                    annotations
+                      .filter(
+                        (a) =>
+                          a.page >= chapter.start &&
+                          a.page <= chapter.end &&
+                          a.understanding !== "unmarked" &&
+                          show[a.kind],
+                      )
+                      .map((a) => (
+                        <span
+                          key={`u-${a.id}`}
+                          className={`rail-understanding understanding-dot ${a.understanding.replaceAll(" ", "-")}`}
+                          style={{
+                            top: `clamp(7px, ${((a.page - chapter.start + (a.rects[0]?.y ?? 0.5)) / count) * 100}%, calc(100% - 7px))`,
+                          }}
+                        />
+                      ))}
+                </span>
               </button>
             );
           })}
           <span
             ref={indicator}
             className="viewport-ring rail-position"
-            aria-hidden="true"
+            role="slider"
+            tabIndex={0}
+            aria-label="Reading position"
+            aria-orientation="vertical"
+            aria-valuemin={1}
+            aria-valuemax={pageCount + 1}
+            aria-valuenow={page + fraction}
+            aria-valuetext={`Page ${pageLabel(page, labels)}, ${Math.round(fraction * 100)}% through page`}
+            data-grabbed={grabbed}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              event.stopPropagation();
+              keep();
+              setHover(null);
+              const track = rail.current?.querySelector<HTMLElement>(
+                '.chapter-segment[data-reading="true"] .chapter-track',
+              );
+              const chapter = chapters.find(
+                (c) => page >= c.start && page <= c.end,
+              );
+              if (!track || !chapter) return;
+              const rect = track.getBoundingClientRect();
+              const position =
+                (page - chapter.start + fraction) /
+                (chapter.end - chapter.start + 1);
+              // Preserve the grabbed point, including when the handle is inset
+              // at the track's ends, rather than snapping the page on pickup.
+              grabOffset.current =
+                event.clientY - (rect.top + position * rect.height);
+              pointerStart.current = event.clientY;
+              dragging.current = false;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setGrabbed(true);
+              onJump(page, fraction, false);
+            }}
+            onPointerMove={(event) => {
+              if (
+                !event.currentTarget.hasPointerCapture(event.pointerId) ||
+                pointerStart.current === null
+              )
+                return;
+              if (
+                !dragging.current &&
+                Math.abs(event.clientY - pointerStart.current) < 2
+              )
+                return;
+              dragging.current = true;
+              scrub(event.clientY - grabOffset.current, false);
+            }}
+            onPointerUp={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId))
+                event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onPointerCancel={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId))
+                event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onLostPointerCapture={() => {
+              setGrabbed(false);
+              dragging.current = false;
+              pointerStart.current = null;
+            }}
+            onKeyDown={(event) => {
+              const step =
+                event.key === "PageDown"
+                  ? 5
+                  : event.key === "PageUp"
+                    ? -5
+                    : event.key === "ArrowDown" || event.key === "ArrowRight"
+                      ? 1
+                      : event.key === "ArrowUp" || event.key === "ArrowLeft"
+                        ? -1
+                        : 0;
+              if (!step && event.key !== "Home" && event.key !== "End") return;
+              event.preventDefault();
+              event.stopPropagation();
+              const target =
+                event.key === "Home"
+                  ? 1
+                  : event.key === "End"
+                    ? pageCount
+                    : Math.max(1, Math.min(pageCount, page + step));
+              setDestination(sectionForPosition(target, 0, sections));
+              onJump(target);
+            }}
           />
         </div>
 
@@ -666,7 +838,7 @@ export function Navigation({
 
         {mode === "map" && hover && (
           <div
-            key={hover.chapter.id}
+            ref={flyout}
             className="section-flyout"
             style={
               {
@@ -677,6 +849,9 @@ export function Navigation({
             onMouseEnter={keep}
             onMouseLeave={leave}
             onFocus={keep}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) leave();
+            }}
           >
             <div
               className="flyout-scroll"
@@ -694,7 +869,9 @@ export function Navigation({
                     <span className="eyebrow">
                       {chapter.id === "FM"
                         ? "Front matter"
-                        : `Chapter ${chapter.id}`}
+                        : /^[ABC]$/.test(chapter.id)
+                          ? `Appendix ${chapter.id}`
+                          : `Chapter ${chapter.id}`}
                     </span>
                     <span>
                       Pages {pageLabel(chapter.start, labels)}–
@@ -709,22 +886,45 @@ export function Navigation({
                         s.title !== `${chapter.id}. ${chapter.title}`,
                     )
                     .map((s, index) => {
+                      const read =
+                        sectionProgress(
+                          sections.indexOf(s),
+                          page,
+                          fraction,
+                          sections,
+                          pageCount,
+                        ) === 1;
                       return (
                         <button
                           key={`${s.title}-${index}`}
-                          className={`flyout-row ${s === current ? "current" : ""} ${s.page < page ? "read" : ""}`}
+                          className={`flyout-row ${s === current ? "current" : ""} ${read ? "read" : ""}`}
+                          aria-current={s === current ? "location" : undefined}
                           style={
                             {
                               "--depth": Math.max(0, (s.depth ?? 0) - 1),
                             } as CSSProperties
                           }
                           onClick={() => {
+                            setDestination(s);
                             onJump(s.page, s.y ?? 0);
-                            setHover(null);
                           }}
                         >
                           <span>{s.title}</span>
                           <RowSignals
+                            preview
+                            labels={labels}
+                            onPreviewEnter={keep}
+                            onPreviewLeave={leave}
+                            onOpen={(annotation) => {
+                              setDestination(
+                                sectionForPosition(
+                                  annotation.page,
+                                  annotation.rects[0]?.y ?? 0,
+                                  sections,
+                                ),
+                              );
+                              onOpenAnnotation(annotation);
+                            }}
                             annotations={annotationsForSection(
                               s,
                               sections,
