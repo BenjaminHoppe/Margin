@@ -10,7 +10,7 @@ import {
 } from "@/lib/reader-model";
 import { studies } from "@/lib/catalog";
 import { ViewMenu } from "./menus";
-import { Presence, Shortcuts, Toast } from "./ui";
+import { Presence, Shortcuts } from "./ui";
 const Thumbnail = dynamic(() => import("./thumbnail"), {
   ssr: false,
   loading: () => (
@@ -26,7 +26,6 @@ export default function Library() {
   );
   const [view, setView] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
-  const [toast, setToast] = useState("");
   useEffect(() => {
     setSaved(readReaderState(localStorage).state);
     setLibrary(
@@ -38,18 +37,20 @@ export default function Library() {
       ),
     );
   }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 3000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-  const stub = () => setToast("Uploads aren’t available in this demo yet");
   return (
-    <div className="library">
+    <div
+      className="library"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => event.preventDefault()}
+    >
       <header className="library-header">
         <span className="wordmark">Margin</span>
         <div>
-          <button className="pill primary" title="Coming soon" onClick={stub}>
+          <button
+            className="pill primary"
+            disabled
+            title="PDF uploads are coming later"
+          >
             <Upload size={15} />
             Upload PDF
           </button>
@@ -68,21 +69,8 @@ export default function Library() {
       <main>
         <h1>Library</h1>
         <p className="library-subtitle">
-          {studies.length} papers · Your study collection
+          {studies.length} curated papers · PDF uploads coming later
         </p>
-        <button
-          className="drop-zone"
-          onClick={stub}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            stub();
-          }}
-        >
-          <Upload size={23} />
-          <strong>Drop a PDF to add it to your library</strong>
-          <span>Upload is coming soon in this demo</span>
-        </button>
         <div className="library-grid">
           {studies.map((study) => {
             const state = library[study.id];
@@ -147,7 +135,6 @@ export default function Library() {
       <Presence open={shortcuts}>
         <Shortcuts onClose={() => setShortcuts(false)} />
       </Presence>
-      <Toast message={toast} />
     </div>
   );
 }

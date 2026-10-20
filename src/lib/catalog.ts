@@ -1,4 +1,5 @@
 import type { Study } from "./study";
+import { studySections } from "./study-sections";
 import { paper } from "./reader-model";
 export type LibraryStudy = Study & { slug: string };
 export const studies: LibraryStudy[] = [
@@ -14,12 +15,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/ceres-brittle-boulders.pdf",
       pageCount: 31,
       fileName: "ceres-brittle-boulders.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["ceres-brittle-boulders"],
     },
     {
       id: "sedna-trajectories",
@@ -31,12 +27,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/sedna-trajectories.pdf",
       pageCount: 14,
       fileName: "sedna-trajectories.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["sedna-trajectories"],
     },
     {
       id: "arxiv-2501.05337",
@@ -49,12 +40,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/mars-jezero.pdf",
       pageCount: 39,
       fileName: "mars-jezero.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["mars-jezero"],
     },
     {
       id: "pluto-new-horizons",
@@ -67,12 +53,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/pluto-new-horizons.pdf",
       pageCount: 8,
       fileName: "pluto-new-horizons.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["pluto-new-horizons"],
     },
     {
       id: "proxima-centauri",
@@ -84,12 +65,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/proxima-centauri.pdf",
       pageCount: 17,
       fileName: "proxima-centauri.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["proxima-centauri"],
     },
     {
       id: "io-volcanic-activity",
@@ -101,12 +77,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/io-volcanic-activity.pdf",
       pageCount: 30,
       fileName: "io-volcanic-activity.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["io-volcanic-activity"],
     },
     {
       id: "voyager-plasma-waves",
@@ -119,12 +90,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/voyager-plasma-waves.pdf",
       pageCount: 13,
       fileName: "voyager-plasma-waves.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["voyager-plasma-waves"],
     },
     {
       id: "voyager-pressure-front",
@@ -137,12 +103,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/voyager-pressure-front.pdf",
       pageCount: 9,
       fileName: "voyager-pressure-front.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["voyager-pressure-front"],
     },
     {
       id: "uranus-magnetosphere",
@@ -155,12 +116,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/uranus-magnetosphere.pdf",
       pageCount: 10,
       fileName: "uranus-magnetosphere.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["uranus-magnetosphere"],
     },
     {
       id: "white-dwarf-colours",
@@ -172,12 +128,7 @@ export const studies: LibraryStudy[] = [
       url: "/papers/white-dwarf-colours.pdf",
       pageCount: 32,
       fileName: "white-dwarf-colours.pdf",
-      sections: [
-        {
-          title: "Paper",
-          page: 1,
-        },
-      ],
+      sections: studySections["white-dwarf-colours"],
     },
   ],
 ];

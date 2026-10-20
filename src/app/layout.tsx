@@ -48,10 +48,28 @@ const editorial = localFont({
   display: "swap",
   fallback: ["Georgia", "serif"],
 });
+const title = "Margin — A little room to think";
+const description =
+  "A research-paper reader that keeps your highlights, notes and questions beside the passage they belong to.";
+const deploymentHost =
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
 export const metadata: Metadata = {
-  title: "Margin — A little room to think",
-  description: "Read closely, keep questions, and make the paper your own.",
+  metadataBase: new URL(
+    deploymentHost ? `https://${deploymentHost}` : "http://localhost:3000",
+  ),
+  applicationName: "Margin",
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    siteName: "Margin",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: { card: "summary_large_image", title, description },
 };
+
 const themeScript = `try{var s=JSON.parse(localStorage.getItem('margin:settings:v1')||'{}');var t=s.theme||'auto';document.documentElement.dataset.theme=t==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;}catch(e){document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}`;
 export default function RootLayout({
   children,

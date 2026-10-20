@@ -251,6 +251,57 @@ test("all library PDFs exist with the catalogued page counts", async () => {
       ),
     }).promise;
     assert.equal(pdf.numPages, study.pageCount, study.title);
+    if (study.slug !== "neptune-odyssey") {
+      assert.ok(
+        study.sections.length > 1,
+        `${study.shortTitle}: missing sections`,
+      );
+      const pages = new Map<number, Awaited<ReturnType<typeof pdf.getPage>>>();
+      const normalize = (value: string) =>
+        value
+          .normalize("NFKD")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+      for (const [index, section] of study.sections.entries()) {
+        assert.ok(
+          section.page >= 1 && section.page <= pdf.numPages,
+          section.title,
+        );
+        assert.ok(
+          index === 0 || section.page >= study.sections[index - 1].page,
+          section.title,
+        );
+        assert.ok(
+          (section.y ?? 0) >= 0 && (section.y ?? 0) <= 1,
+          section.title,
+        );
+        assert.ok((section.depth ?? 0) >= 0, section.title);
+        // These two labels describe unheaded opening/figure pages.
+        if (["Overview", "Extended data"].includes(section.title)) continue;
+        let page = pages.get(section.page);
+        if (!page) {
+          page = await pdf.getPage(section.page);
+          pages.set(section.page, page);
+        }
+        const text = await page.getTextContent();
+        const heading = normalize(
+          study.slug === "voyager-plasma-waves" &&
+            section.title === "References"
+            ? "1. Gurnett"
+            : section.title.replace(/^Appendix [ABC]\. /, ""),
+        );
+        const contents = normalize(
+          text.items
+            .filter((item) => "str" in item)
+            .map((item) => item.str)
+            .join(""),
+        );
+        assert.ok(
+          contents.includes(heading),
+          `${study.shortTitle}: ${section.title} is not on PDF page ${section.page}`,
+        );
+      }
+    }
     await pdf.destroy();
   }
 });

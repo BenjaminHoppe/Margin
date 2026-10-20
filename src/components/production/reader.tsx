@@ -227,9 +227,11 @@ export default function Reader({ study: paper }: { study: Study }) {
       setSections(
         neptune
           ? normalizeOutline(outline)
-          : outline.length
-            ? outline
-            : paper.sections,
+          : paper.sections.length > 1
+            ? paper.sections
+            : outline.length
+              ? outline
+              : paper.sections,
       );
     },
     [neptune, paper],

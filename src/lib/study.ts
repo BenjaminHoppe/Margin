@@ -1,4 +1,9 @@
-export type Section = { title: string; page: number };
+export type Section = {
+  title: string;
+  page: number;
+  depth?: number;
+  y?: number;
+};
 export type Study = {
   id: string;
   hash: string;

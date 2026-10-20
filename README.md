@@ -21,7 +21,7 @@ The map supports clicking, dragging, scrolling and keyboard navigation. The cont
 
 ## Assets
 
-Controls and body UI use the supplied 00 Hypertext family through `next/font/local`; the wordmark, reader title, and large chapter headings use the locally supplied Wagram font. Small sidebar rows retain Hypertext. Wagram is excluded from version control; provide the licensed font file locally before building. The 25 supplied font files live in `src/app/fonts`; only six used faces load. See that directory's README for the non-commercial license notice. The full supplied PDF is `public/papers/neptune-odyssey.pdf`. These files are present and eligible for version control; no commits were made.
+Controls and body UI use the supplied 00 Hypertext family through `next/font/local`; the wordmark, reader title, and large chapter headings use the locally supplied Wagram font. Small sidebar rows retain Hypertext. All 26 supplied font files, including Wagram, are included in `src/app/fonts` for reproducible GitHub/Vercel builds; only the seven used faces load. See that directory's README for the non-commercial license notice. The full supplied PDF is `public/papers/neptune-odyssey.pdf`. These files are present and eligible for version control; no commits were made.
 
 ## Checks
 
@@ -37,3 +37,16 @@ Tests cover geometry, persistence and migration, corrupted data, section boundar
 ## Study collection
 
 Neptune, Mars, Pluto, Sedna, Ceres, Proxima Centauri, Io, two Voyager interstellar studies, Uranus and white dwarfs are bundled locally. Only Neptune receives demo notes. Reading position and exports stay associated with each individual paper. The sixteen-item demo includes four layout samples in Triton’s comparative-planetology section. Reload restores these sample cards, discarding session additions and edits.
+
+
+## Production deployment
+
+The current demo is deployed at https://margin-flame-omega.vercel.app. The Vercel project is connected to BenjaminHoppe/Margin; pushes to the production branch trigger builds.
+
+For a manual CLI deployment, build and deploy with:
+
+```sh
+vercel pull --yes --environment=production --scope benjamin-hoppes-projects
+VERCEL_PROJECT_PRODUCTION_URL=margin-flame-omega.vercel.app pnpm dlx vercel@latest build --prod --yes --scope benjamin-hoppes-projects
+pnpm dlx vercel@latest deploy --prebuilt --prod --yes --scope benjamin-hoppes-projects
+```

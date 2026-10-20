@@ -7,6 +7,7 @@ export default defineConfig([
   { rules: { "react-hooks/set-state-in-effect": "off" } },
   globalIgnores([
     ".next/**",
+    ".vercel/**",
     "public/pdfjs/**",
     "playwright-report/**",
     "test-results/**",
