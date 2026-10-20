@@ -768,7 +768,7 @@ kbd {
   display: block;
   position: relative;
   width: 64px;
-  min-height: 36px;
+  min-height: 48px;
   flex-basis: 0;
   flex-shrink: 0;
   touch-action: none;
@@ -778,6 +778,8 @@ kbd {
 .chapter-label {
   position: absolute;
   left: 4px;
+  width: 16px;
+  text-align: center;
   top: var(--chapter-inset);
   font-family: var(--font-mono);
   font-size: 13px;
@@ -913,7 +915,7 @@ kbd {
   max-height: calc(100dvh - var(--flyout-top, 80px) - 24px);
   display: flex;
   flex-direction: column;
-  padding: 4px;
+  padding: 8px 4px 4px;
   border-radius: 16px;
   --flyout-row-current: #ffffff17;
   --flyout-row-hover: #ffffff0d;
@@ -936,7 +938,7 @@ kbd {
 .flyout-scroll {
   position: relative;
   min-height: 0;
-  padding: 12px 8px;
+  padding: 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
   overflow-anchor: none;
@@ -960,7 +962,7 @@ kbd {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 8px;
-  padding: 0 8px;
+  padding: 0 12px;
   color: var(--flyout-muted);
   font: 12px/20px var(--font-mono);
 }
@@ -973,7 +975,7 @@ kbd {
   font-size: 20px;
   line-height: 24px;
   color: var(--toolbar-text);
-  padding: 8px 8px 12px;
+  padding: 12px 12px 16px;
 }
 .flyout-row {
   display: flex;
@@ -981,9 +983,10 @@ kbd {
   gap: 8px;
   position: relative;
   text-align: left;
-  padding: 12px 8px 12px calc(8px + var(--depth, 0) * 8px);
+  padding: 12px;
+  margin-left: calc(var(--depth, 0) * 8px);
   border-radius: 12px;
-  width: 100%;
+  width: calc(100% - var(--depth, 0) * 8px);
   min-height: 44px;
   margin-bottom: 4px;
   font-size: 13px;
@@ -1069,7 +1072,7 @@ kbd {
     black calc(100% - 8px),
     transparent
   );
-  padding: 12px;
+  padding: 8px;
 }
 .contents-row {
   position: relative;
@@ -2462,7 +2465,7 @@ button:not(.chapter-segment):not(.range-tick),
   }
   .chapter-segment {
     --chapter-inset: 4px;
-    min-height: 28px;
+    min-height: 32px;
     flex-basis: 0;
   }
 }
