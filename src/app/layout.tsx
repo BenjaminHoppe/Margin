@@ -41,6 +41,13 @@ const mono = localFont({
   display: "swap",
   fallback: ["Courier New", "monospace"],
 });
+const editorial = localFont({
+  src: "./fonts/WagramNonCommercial-Regular.otf",
+  variable: "--font-wagram",
+  weight: "400",
+  display: "swap",
+  fallback: ["Georgia", "serif"],
+});
 export const metadata: Metadata = {
   title: "Margin — A little room to think",
   description: "Read closely, keep questions, and make the paper your own.",
@@ -53,7 +60,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${sans.variable} ${mono.variable}`}
+      className={`${sans.variable} ${mono.variable} ${editorial.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

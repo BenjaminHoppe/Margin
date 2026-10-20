@@ -11,6 +11,9 @@ import {
   chaptersFromOutline,
   paper,
   sectionForAnnotation,
+  annotationsForSection,
+  sectionForPosition,
+  sectionProgress,
   readerKey,
 } from "../src/lib/reader-model";
 import { studies } from "../src/lib/catalog";
@@ -21,7 +24,7 @@ test("new reader starts at printed page 8 with a complete seeded workflow", () =
   const state = initialReaderState();
   assert.equal(state.position.page, 19);
   assert.equal(pageLabel(19), "8");
-  assert.equal(state.annotations.length, 12);
+  assert.equal(state.annotations.length, 16);
   const chapters = chaptersFromOutline(fallbackSections);
   const populated = chapters.filter((c) =>
     state.annotations.some((a) => a.page >= c.start && a.page <= c.end),
@@ -50,7 +53,7 @@ test("existing notes migrate without replacing the legacy data", () => {
     result.state.annotations.find((a) => a.id === "my-note")?.body,
     "My existing note",
   );
-  assert.equal(result.state.annotations.length, 13);
+  assert.equal(result.state.annotations.length, 17);
   assert.equal(result.state.position.page, 20);
   assert.ok(writes.includes(READER_KEY));
 });
@@ -116,7 +119,7 @@ test("quote normalization handles typography, line breaks and footnotes", () => 
   );
   assert.equal(normalizedQuote("ﬁeld"), normalizedQuote("field"));
 });
-test("all twelve seed passages resolve to valid coordinates in the supplied PDF", async () => {
+test("all sixteen seed passages resolve to valid coordinates in the supplied PDF", async () => {
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const pdf = await getDocument({
     data: new Uint8Array(
@@ -229,8 +232,8 @@ test("the new demo is added once while preserving personal annotations and draft
   const first = readReaderState({
     getItem: (key) => (key === READER_KEY ? JSON.stringify(old) : null),
   }).state;
-  assert.equal(first.annotations.length, 13);
-  assert.equal(first.demoSeedVersion, 3);
+  assert.equal(first.annotations.length, 17);
+  assert.equal(first.demoSeedVersion, 4);
   assert.equal(first.draft?.body, note.body);
   const second = readReaderState({
     getItem: (key) => (key === READER_KEY ? JSON.stringify(first) : null),
@@ -250,4 +253,84 @@ test("all library PDFs exist with the catalogued page counts", async () => {
     assert.equal(pdf.numPages, study.pageCount, study.title);
     await pdf.destroy();
   }
+});
+
+test("same-page headings complete preceding segments and select the correct section", () => {
+  const sections = [
+    { title: "Chapter", page: 12, y: 0.1 },
+    { title: "First section", page: 12, y: 0.1 },
+    { title: "Second section", page: 12, y: 0.6 },
+    { title: "Next page", page: 13, y: 0.2 },
+  ];
+  assert.equal(sectionForPosition(12, 0.6, sections).title, "Second section");
+  assert.equal(sectionProgress(0, 12, 0.6, sections, 116), 1);
+  assert.equal(sectionProgress(1, 12, 0.6, sections, 116), 1);
+  assert.equal(sectionProgress(2, 12, 0.6, sections, 116), 0);
+  assert.ok(sectionProgress(2, 12, 0.9, sections, 116) > 0);
+  assert.equal(sectionProgress(2, 13, 0.1999, sections, 116), 1);
+  assert.equal(sectionProgress(3, 12, 0.6, sections, 116), 0);
+});
+
+test("short outline sections are not skipped by active-section tolerance", () => {
+  const sections = [
+    { title: "Short section", page: 12, y: 0.2 },
+    { title: "Next section", page: 12, y: 0.203 },
+  ];
+  assert.equal(sectionForPosition(12, 0.2, sections).title, "Short section");
+  assert.equal(sectionForPosition(12, 0.202, sections).title, "Short section");
+  assert.equal(sectionForPosition(12, 0.203, sections).title, "Next section");
+});
+
+test("layout samples append once without replacing edited v3 annotations or drafts", () => {
+  const edited = { ...seedAnnotations()[0], body: "My edited demo note" };
+  const previous = {
+    ...initialReaderState(),
+    demoSeedVersion: 3,
+    annotations: [edited],
+    draft: { ...edited },
+  };
+  const first = readReaderState({
+    getItem: () => JSON.stringify(previous),
+  }).state;
+  assert.equal(first.annotations.length, 5);
+  assert.deepEqual(first.annotations[0], edited);
+  assert.deepEqual(first.draft, previous.draft);
+  const second = readReaderState({
+    getItem: () => JSON.stringify(first),
+  }).state;
+  assert.deepEqual(second.annotations, first.annotations);
+});
+test("sidebar markers separate same-page siblings while including a parent's descendants", () => {
+  const sections = [
+    { title: "Chapter", page: 20, y: 0, depth: 0 },
+    { title: "Triton", page: 20, y: 0.2, depth: 1 },
+    { title: "Rings", page: 20, y: 0.7, depth: 1 },
+  ];
+  const base = seedAnnotations()[0];
+  const annotations = [
+    {
+      ...base,
+      id: "triton",
+      page: 20,
+      rects: [{ x: 0.1, y: 0.4, width: 0.2, height: 0.02 }],
+    },
+    {
+      ...base,
+      id: "rings",
+      page: 20,
+      rects: [{ x: 0.1, y: 0.8, width: 0.2, height: 0.02 }],
+    },
+  ];
+  assert.deepEqual(
+    annotationsForSection(sections[1], sections, annotations).map((a) => a.id),
+    ["triton"],
+  );
+  assert.deepEqual(
+    annotationsForSection(sections[2], sections, annotations).map((a) => a.id),
+    ["rings"],
+  );
+  assert.equal(
+    annotationsForSection(sections[0], sections, annotations).length,
+    2,
+  );
 });

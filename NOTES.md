@@ -2,7 +2,7 @@
 
 - Production Figma frames determine visuals; the supplied brief determines behavior. The PDF is 600px wide at 1440px, scales from 520 to 760px on desktop, and remains centered when modes change. The fixed title has a continuous blur/fade into the canvas.
 - The real PDF outline and heading destinations determine chapter boundaries and annotation grouping. Appendix A begins at PDF page 49, B at 53 and C at 114. The file has no embedded page labels, so labels use the verified front-matter/main-body/appendix mapping.
-- Internal annotation field names remain compatible with the earlier reader. Exports expose the brief's type, pdfPage and understanding values. Existing browser notes and drafts take precedence over demo seeds; fresh browser storage gets twelve seeds. Corrupted storage is preserved and automatic writes are blocked until recovery.
+- Internal annotation field names remain compatible with the earlier reader. Exports expose the brief's type, pdfPage and understanding values. Existing browser notes and drafts take precedence over demo seeds; fresh browser storage gets sixteen seeds. Corrupted storage is preserved and automatic writes are blocked until recovery.
 - The original reader and legacy document modules remain isolated for preservation. New routes use components/production. The old Mars PDF and old font assets are unused by the new routes.
 - Intentional stubs: upload/drop, annotation more menu, Go to page, Search and Undo. Each renders safely with feedback. No backend, login or cloud sync.
 - Browser checks used a separate production origin on port 3001, preserving the user's localhost:3000 notes. Verified first-run seeds, actual text selection, composer save and reload persistence, Margin/List/Hidden, question filtering, contents, Focus restoration, theme controls, shortcut sheet, Markdown download, export format selection, and centered sizing at 1280/1440/1920 plus a 390px fallback. No browser console errors were observed during this pass. Only nearby PDF canvases mounted.
@@ -20,3 +20,23 @@ The library now contains all 11 supplied Desktop studies, served locally from pu
 ## Sidebar polish after voice review
 
 The rail reserves a minimum of 28px per chapter (24px on short windows), with larger labels and contained markers. A single measured position ring travels across chapter boundaries and stays inset at the ends; dragging can cross chapter boundaries. The contents panel caps at 360px, reserves room for page numbers, wraps titles, and animates tree expansion/collapse with inert hidden rows. The compact rail disappears during expansion and waits for the contents exit before returning. Both ends of the contents scroller use an 8px fade. The brown dark-mode flyout has an integrated bordered pointer and a continuous scrollable chapter list, initially positioned at the hovered chapter. Demo revision 3 distributes twelve verified passages across front matter, science, engineering, schedule, cost, and appendices; personal notes and drafts remain intact. Circle-marker click behavior is intentionally deferred for the user's next review.
+
+## Second sidebar review
+
+The flyout is chapter-scoped again: continuous browsing across all chapters was not the intended behavior. Rail dragging still crosses chapter boundaries. Hover backgrounds extend 3px above/below the segments. The rail ring follows the same progress coordinate as the fill, clamped only at endpoints, without an extra lagging transition. Rail pointer jitter under 4px no longer cancels a smooth click jump. Stable, inert navigation layers now sequence their fades without remounting, delayed appearance hacks, or shifting the panel origin. The expanded view uses its filled active spine instead of another outlined ring. Flyout active styling uses a rounded inset edge, and row markers/page labels align vertically. The supplied Wagram face supplies the serif wordmark, paper title, and large flyout chapter headings; small sidebar rows and controls retain Hypertext. The Wagram file remains excluded from version control. Appendices is larger and aligned with top-level title text. No screenshots were captured during this pass, following the user's voice instruction.
+
+## Sidebar annotation marker previews
+
+Expanded-sidebar annotation markers show the same complete cards as Margin view, using a read-only variant of the shared AnnotationCard component. Multiple matching cards stack in a scrollable hover panel outside the masked sidebar. The pointer can move onto the preview to read it. Scrolling the document, resizing, Escape, or leaving the marker and preview dismisses it. Marker clicks do not navigate or change annotation visibility. Click-to-reveal behavior remains a future consideration.
+
+## Triton layout samples
+
+Demo revision 4 adds four verified annotations to “Triton as a Kuiper Belt Dwarf Planet”: one note, two questions, and one highlight. Revision 3 migration appends these once without replacing existing annotations, edited demo entries, deleted older seeds, or drafts. Sidebar signal grouping uses heading positions and subtree bounds, so adjacent sections on the same page do not share unrelated markers. Signals remain grouped by type; multiple matching cards stack in the hover preview.
+
+## Annotation summary hover panel
+
+Parent rows retain annotation summaries in both expanded and collapsed states, keeping markers and title wrapping stable. Hover previews now share a bordered, padded surface, capped by the available viewport height with 24px clearance at the bottom. The card stack scrolls internally, contains overscroll, and remains hover-only.
+
+## Preview card interaction
+
+Single hover cards have no extra outer surface; multiple cards share the scrollable container. The originating marker stays highlighted throughout marker/preview hover. Preview cards use a dedicated sidebar-opening action: select the annotation and scroll directly to its passage while preserving the annotation display mode, including Hidden. The sidebar destination is held active during the jump so it does not flash through ancestor sections. Card clicks do not toggle section rows. Paper scrolling does not dismiss the preview; scrolling its source sidebar does. Marker clicks themselves remain hover-only.

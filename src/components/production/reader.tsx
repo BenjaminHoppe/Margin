@@ -61,9 +61,19 @@ export default function Reader({ study: paper }: { study: Study }) {
   const [screenWidth, setScreenWidth] = useState(() => innerWidth);
   const [visiblePages, setVisiblePages] = useState([saved.position.page]);
   const [ready, setReady] = useState(false);
+  const [animateProgress, setAnimateProgress] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
   const restored = useRef(false);
   const scrollFrame = useRef<number | null>(null);
+  const jumpEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingJump = useRef<{
+    page: number;
+    fraction: number;
+    top: number;
+  } | null>(null);
+  const pageGeometry = useRef<{ page: number; top: number; height: number }[]>(
+    [],
+  );
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedRef = useRef(saved);
   const focusButton = useRef<HTMLButtonElement>(null);
@@ -90,6 +100,7 @@ export default function Reader({ study: paper }: { study: Study }) {
     return () => {
       window.removeEventListener("resize", resize);
       if (toastTimer.current) clearTimeout(toastTimer.current);
+      if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
       if (scrollFrame.current !== null)
         cancelAnimationFrame(scrollFrame.current);
     };
@@ -124,6 +135,26 @@ export default function Reader({ study: paper }: { study: Study }) {
     }, 250);
     return () => clearTimeout(timer);
   }, [saved, initial.error, storageKey]);
+  const finishJump = useCallback(() => {
+    const target = pendingJump.current;
+    const root = viewport.current;
+    // Native smooth scrolling can settle just shy of an exact fractional
+    // heading. Keep the requested outline coordinate on arrival, not the
+    // preceding section selected by subpixel rounding.
+    if (target && root && Math.abs(root.scrollTop - target.top) <= 2) {
+      setSaved((old) => ({
+        ...old,
+        position: { page: target.page, fraction: target.fraction },
+      }));
+    }
+    pendingJump.current = null;
+    setAnimateProgress(false);
+  }, []);
+  const interruptJump = useCallback(() => {
+    pendingJump.current = null;
+    if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
+    setAnimateProgress(false);
+  }, []);
   const jump = useCallback(
     (page: number, fraction = 0, smooth = true) => {
       const root = viewport.current;
@@ -132,21 +163,28 @@ export default function Reader({ study: paper }: { study: Study }) {
       const el = root.querySelector<HTMLElement>(`[data-page="${target}"]`);
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      root.scrollTo({
-        top:
+      const animated =
+        smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+      setAnimateProgress(animated);
+      if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
+      // Also settle clicks that are already at their destination and emit no scroll.
+      const top = Math.max(
+        0,
+        Math.min(
+          root.scrollHeight - root.clientHeight,
           root.scrollTop +
-          rect.top -
-          root.getBoundingClientRect().top -
-          84 +
-          fraction * rect.height,
-        behavior:
-          smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "smooth"
-            : "instant",
-      });
+            rect.top -
+            root.getBoundingClientRect().top -
+            84 +
+            fraction * rect.height,
+        ),
+      );
+      pendingJump.current = animated ? { page: target, fraction, top } : null;
+      jumpEndTimer.current = setTimeout(finishJump, 200);
+      root.scrollTo({ top, behavior: animated ? "smooth" : "instant" });
       setSelection(null);
     },
-    [paper.pageCount],
+    [paper.pageCount, finishJump],
   );
   useLayoutEffect(() => {
     if (!ready) return;
@@ -191,36 +229,55 @@ export default function Reader({ study: paper }: { study: Study }) {
     },
     [],
   );
+  // Page boxes have stable dimensions between layout changes. Cache document
+  // coordinates rather than measuring every page on every animation frame.
+  useLayoutEffect(() => {
+    const root = viewport.current;
+    if (!ready || !root) return;
+    const elements = Array.from(
+      root.querySelectorAll<HTMLElement>("[data-page]"),
+    );
+    const measure = () => {
+      const origin = root.getBoundingClientRect().top - root.scrollTop;
+      pageGeometry.current = elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          page: Number(element.dataset.page),
+          top: rect.top - origin,
+          height: rect.height,
+        };
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [ready, width, paper.id]);
   function scroll() {
+    if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
+    jumpEndTimer.current = setTimeout(finishJump, 120);
     setSelection(null);
     if (scrollFrame.current !== null) return;
     scrollFrame.current = requestAnimationFrame(() => {
       scrollFrame.current = null;
       const root = viewport.current;
       if (!root || !restored.current) return;
-      const top = root.getBoundingClientRect().top + 84;
-      const bottom = root.getBoundingClientRect().bottom;
-      const pages = Array.from(
-        root.querySelectorAll<HTMLElement>("[data-page]"),
-      ).map((el) => ({
-        page: Number(el.dataset.page),
-        rect: el.getBoundingClientRect(),
-      }));
+      const top = root.scrollTop + 84;
+      const bottom = root.scrollTop + root.clientHeight;
+      const pages = pageGeometry.current;
       const visible = pages
-        .filter((p) => p.rect.bottom > top && p.rect.top < bottom)
+        .filter((p) => p.top + p.height > top && p.top < bottom)
         .map((p) => p.page);
       setVisiblePages((previous) =>
         previous.join(",") === visible.join(",") ? previous : visible,
       );
-      const anchor = pages.find((p) => p.rect.bottom > top) ?? pages.at(-1);
+      const anchor = pages.find((p) => p.top + p.height > top) ?? pages.at(-1);
       if (!anchor) return;
       const fraction =
         root.scrollTop + root.clientHeight >= root.scrollHeight - 3
           ? 1
-          : Math.max(
-              0,
-              Math.min(1, (top - anchor.rect.top) / anchor.rect.height),
-            );
+          : Math.max(0, Math.min(1, (top - anchor.top) / anchor.height));
       setSaved((old) =>
         old.position.page === anchor.page &&
         Math.abs(old.position.fraction - fraction) < 0.0001
@@ -251,6 +308,16 @@ export default function Reader({ study: paper }: { study: Study }) {
         );
     },
     [focus, mode, jump],
+  );
+  const openSidebarAnnotation = useCallback(
+    (annotation: Annotation) => {
+      // Sidebar previews already expose the card. Preserve the chosen display
+      // mode instead of creating a temporary margin card in Hidden mode.
+      setSaved((old) => ({ ...old, active: annotation.id }));
+      setPeek(null);
+      jump(annotation.page, annotation.rects[0]?.y ?? 0);
+    },
+    [jump],
   );
   function clearSelection() {
     setSelection(null);
@@ -627,6 +694,7 @@ export default function Reader({ study: paper }: { study: Study }) {
         </section>
       )}
       <Navigation
+        animateProgress={animateProgress}
         pageCount={paper.pageCount}
         neptune={neptune}
         mode={saved.minimap}
@@ -639,6 +707,7 @@ export default function Reader({ study: paper }: { study: Study }) {
         show={saved.showOnPage}
         onMode={(minimap) => setSaved((old) => ({ ...old, minimap }))}
         onJump={jump}
+        onOpenAnnotation={openSidebarAnnotation}
       />
       <main
         className="paper-viewport"
@@ -646,6 +715,23 @@ export default function Reader({ study: paper }: { study: Study }) {
         tabIndex={0}
         aria-label="Continuous PDF document"
         onScroll={scroll}
+        onWheelCapture={interruptJump}
+        onTouchStartCapture={interruptJump}
+        onPointerDownCapture={interruptJump}
+        onKeyDownCapture={(event) => {
+          if (
+            [
+              "ArrowUp",
+              "ArrowDown",
+              "PageUp",
+              "PageDown",
+              "Home",
+              "End",
+              " ",
+            ].includes(event.key)
+          )
+            interruptJump();
+        }}
       >
         {documentView}
       </main>

@@ -13,7 +13,7 @@ Open http://localhost:3000. The Library contains all 11 supplied studies, each w
 
 ## Reader
 
-The complete 116-page Neptune Odyssey report opens at printed page 8 with twelve sample annotations on first visit. Nearby pages mount canvases and text layers; all page dimensions reserve space for stable scrolling. The centered PDF keeps its position across Margin, List, Hidden, contents and Focus modes.
+The complete 116-page Neptune Odyssey report opens at printed page 8 with sixteen sample annotations on first visit. Nearby pages mount canvases and text layers; all page dimensions reserve space for stable scrolling. The centered PDF keeps its position across Margin, List, Hidden, contents and Focus modes.
 
 Select PDF text to highlight, write a note, ask a question or mark understanding. Notes, passage anchors, drafts, display settings and reading position persist per paper. Existing Neptune notes migrate from the earlier storage key without deleting the originals. Export Markdown, JSON or CSV, with optional quotes and printed page labels.
 
@@ -21,7 +21,7 @@ The map supports clicking, dragging, scrolling and keyboard navigation. The cont
 
 ## Assets
 
-All UI typography uses the supplied 00 Hypertext family through `next/font/local`. The 25 supplied font files live in `src/app/fonts`; only six used faces load. See that directory's README for the non-commercial license notice. The full supplied PDF is `public/papers/neptune-odyssey.pdf`. These files are present and eligible for version control; no commits were made.
+Controls and body UI use the supplied 00 Hypertext family through `next/font/local`; the wordmark, reader title, and large chapter headings use the locally supplied Wagram font. Small sidebar rows retain Hypertext. Wagram is excluded from version control; provide the licensed font file locally before building. The 25 supplied font files live in `src/app/fonts`; only six used faces load. See that directory's README for the non-commercial license notice. The full supplied PDF is `public/papers/neptune-odyssey.pdf`. These files are present and eligible for version control; no commits were made.
 
 ## Checks
 
@@ -32,8 +32,8 @@ pnpm typecheck
 pnpm build
 ```
 
-Tests cover geometry, persistence and migration, corrupted data, section boundaries, exports, and locating all twelve seed quotes in the real PDF. See `NOTES.md` for implementation choices, browser validation and remaining release steps.
+Tests cover geometry, persistence and migration, corrupted data, section boundaries, exports, and locating all sixteen seed quotes in the real PDF. See `NOTES.md` for implementation choices, browser validation and remaining release steps.
 
 ## Study collection
 
-Neptune, Mars, Pluto, Sedna, Ceres, Proxima Centauri, Io, two Voyager interstellar studies, Uranus and white dwarfs are bundled locally. Only Neptune receives demo notes. Reading position, annotations and exports stay associated with each individual paper. The new twelve-item demo is added once alongside personal notes and drafts already saved in the browser.
+Neptune, Mars, Pluto, Sedna, Ceres, Proxima Centauri, Io, two Voyager interstellar studies, Uranus and white dwarfs are bundled locally. Only Neptune receives demo notes. Reading position, annotations and exports stay associated with each individual paper. The sixteen-item demo includes four layout samples in Triton’s comparative-planetology section. Upgrading from the twelve-item demo appends only those four samples, preserving existing notes, edited demo cards, and drafts.

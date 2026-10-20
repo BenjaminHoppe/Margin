@@ -263,6 +263,8 @@ export default function PdfView({
     <Document
       key={retry}
       file={study.url}
+      externalLinkTarget="_blank"
+      externalLinkRel="noopener noreferrer"
       options={options}
       loading={<div className="pdf-message">Opening the original paper…</div>}
       error={failure}

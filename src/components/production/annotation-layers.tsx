@@ -56,29 +56,32 @@ export function EmptyAnnotations() {
     </div>
   );
 }
-function AnnotationCard({
+export function AnnotationCard({
   annotation,
-  active,
+  active = false,
   labels,
   onOpen,
   onStub,
+  preview = false,
 }: {
   annotation: Annotation;
-  active: boolean;
+  active?: boolean;
   labels: string[] | null;
-  onOpen: (a: Annotation) => void;
-  onStub: () => void;
+  onOpen?: (a: Annotation) => void;
+  onStub?: () => void;
+  preview?: boolean;
 }) {
+  const Main = preview && !onOpen ? "div" : "button";
   return (
     <article
       className={`annotation-card ${annotation.kind} ${active ? "active" : ""}`}
-      data-card-id={annotation.id}
+      data-card-id={preview ? undefined : annotation.id}
     >
-      <button
+      <Main
         className="card-main"
-        onClick={() => onOpen(annotation)}
+        onClick={onOpen ? () => onOpen(annotation) : undefined}
         aria-label={`Open ${annotation.kind} on page ${pageLabel(annotation.page, labels)}: ${annotation.body || annotation.quote}`}
-        aria-pressed={active}
+        aria-pressed={onOpen ? active : undefined}
       >
         <span className="card-meta">
           <span className="type-pill">
@@ -95,15 +98,17 @@ function AnnotationCard({
           question={annotation.kind === "question"}
           resolved={annotation.resolved}
         />
-      </button>
-      <button
-        className="card-more"
-        aria-label="More annotation options · coming soon"
-        title="Coming soon"
-        onClick={onStub}
-      >
-        <MoreHorizontal size={16} />
-      </button>
+      </Main>
+      {!preview && (
+        <button
+          className="card-more"
+          aria-label="More annotation options · coming soon"
+          title="Coming soon"
+          onClick={onStub}
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      )}
     </article>
   );
 }

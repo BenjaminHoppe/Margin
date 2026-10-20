@@ -121,6 +121,34 @@ const seedRows: [Kind, number, string, string, Understanding][] = [
     "Come back to this sequence after the science sections. I want to connect each measurement to the short window when the probe can actually collect it.",
     "understood",
   ],
+  [
+    "note",
+    20,
+    "Because Triton is a captured Kuiper Belt dwarf planet, its attributes can be tested against Pluto and Charon",
+    "Triton is a chance to study a Kuiper Belt world repeatedly from orbit around Neptune, rather than relying on another one-off flyby.",
+    "understood",
+  ],
+  [
+    "question",
+    20,
+    "How and why are Triton’s geology and geophysics different from Pluto and Charon?",
+    "Which differences would tell us about where Triton formed, and which could have been produced by heating after Neptune captured it?",
+    "partly understood",
+  ],
+  [
+    "highlight",
+    20,
+    "Triton, as a dwarf planet orbiting a giant planet, is thus the most accessible Kuiper Belt dwarf planet",
+    "The mission gets two kinds of world in one destination: an ice giant and a captured dwarf planet.",
+    "unmarked",
+  ],
+  [
+    "question",
+    20,
+    "how did the capture of Triton impact its bulk composition and interior structure compared to dwarf planets elsewhere in the Kuiper Belt?",
+    "Could capture have erased the evidence we need to compare Triton with Pluto? I want to understand which chemical or geological clues could survive that history.",
+    "unclear",
+  ],
 ];
 export function seedAnnotations(): Annotation[] {
   return seedRows.map(([kind, page, quote, body, understanding], i) => ({
@@ -143,7 +171,7 @@ export function initialReaderState(study: Study = paper): ReaderState {
   const neptune = study.id === paper.id;
   return {
     version: 1,
-    demoSeedVersion: 3,
+    demoSeedVersion: 4,
     annotations: neptune ? seedAnnotations() : [],
     draft: null,
     position: { page: neptune ? 19 : 1, fraction: 0 },
@@ -192,13 +220,25 @@ export function readReaderState(
   error: string;
 } {
   const defaults = initialReaderState(study);
-  const withDemo = (annotations: Annotation[], revision?: number) =>
-    study.id === paper.id && revision !== 3
-      ? [
-          ...seedAnnotations(),
-          ...annotations.filter((a) => !/^seed-\d+$/.test(a.id)),
-        ]
-      : annotations;
+  const withDemo = (annotations: Annotation[], revision?: number) => {
+    if (study.id !== paper.id || revision === 4) return annotations;
+    // The extra layout samples are additive: preserve every existing v3 note,
+    // including edited demo annotations and intentionally removed older seeds.
+    const previous =
+      revision === 3
+        ? annotations
+        : [
+            ...seedAnnotations().slice(0, 12),
+            ...annotations.filter((a) => !/^seed-\d+$/.test(a.id)),
+          ];
+    const ids = new Set(previous.map((a) => a.id));
+    return [
+      ...previous,
+      ...seedAnnotations()
+        .slice(12)
+        .filter((a) => !ids.has(a.id)),
+    ];
+  };
   try {
     const raw = storage.getItem(readerKey(study));
     if (raw) {
@@ -218,7 +258,7 @@ export function readReaderState(
           ...defaults,
           ...value,
           annotations: withDemo(value.annotations, value.demoSeedVersion),
-          demoSeedVersion: 3,
+          demoSeedVersion: 4,
           draft: value.draft ?? null,
           position: {
             page: Math.max(
@@ -348,8 +388,58 @@ export function sectionForPage(
 ) {
   return [...sections].reverse().find((s) => s.page <= page) ?? sections[0];
 }
+// Use the same heading coordinates for navigation, active rows, and progress.
+export function sectionForPosition(
+  page: number,
+  fraction: number,
+  sections: OutlineSection[],
+) {
+  const position = page + fraction + 0.0001;
+  return (
+    [...sections].reverse().find((s) => s.page + (s.y ?? 0) <= position) ??
+    sections[0]
+  );
+}
+export function sectionProgress(
+  index: number,
+  page: number,
+  fraction: number,
+  sections: OutlineSection[],
+  pageCount: number,
+) {
+  const section = sections[index];
+  const following = sections[index + 1];
+  const start = section.page + (section.y ?? 0);
+  const end = following ? following.page + (following.y ?? 0) : pageCount + 1;
+  const position = page + fraction;
+  if (position + 0.005 >= end) return 1;
+  if (position <= start) return 0;
+  return Math.max(
+    0,
+    Math.min(1, (position - start) / Math.max(0.0001, end - start)),
+  );
+}
 // Outline destinations can start halfway down a page. Use the passage's
 // vertical anchor so a preceding section owns text above the next heading.
+// Headings consistently summarize their subtree, whether expanded or collapsed.
+// Page fractions distinguish adjacent sections on the same sheet.
+export function annotationsForSection(
+  section: OutlineSection,
+  sections: OutlineSection[],
+  annotations: Annotation[],
+) {
+  const index = sections.indexOf(section);
+  if (index < 0) return [];
+  const next = sections
+    .slice(index + 1)
+    .find((s) => (s.depth ?? 0) <= (section.depth ?? 0));
+  const start = section.page + (section.y ?? 0);
+  const end = next ? next.page + (next.y ?? 0) : Infinity;
+  return annotations.filter((a) => {
+    const position = a.page + (a.rects[0]?.y ?? 0);
+    return position >= start && position < end;
+  });
+}
 export function sectionForAnnotation(
   annotation: Annotation,
   sections: OutlineSection[],
