@@ -20,7 +20,7 @@
   --current-row: #ece8e0;
   --minimap-current: #ddd6ca;
   --minimap-hover: color-mix(in srgb, #9b805a 8%, transparent);
-  --preview-card-hover: #f0ebe2;
+  --preview-card-hover: #f5f2ed;
   --preview-card-hover-shadow: var(--e1);
   --list-row-hover: #f0ebe2;
   --highlight: #f2c94c;
@@ -2504,9 +2504,7 @@ a[href] * {
 
 /* Hover previews are portaled beyond the masked sidebar scroller. */
 .signal-preview-target {
-  --marker-hover: color-mix(in srgb, var(--signal) 18%, transparent);
-  --marker-hover-ring: inset 0 0 0 1px
-    color-mix(in srgb, var(--signal) 30%, transparent);
+  --marker-hover: color-mix(in srgb, var(--text) 12%, transparent);
   position: relative;
   isolation: isolate;
   display: inline-flex;
@@ -2514,6 +2512,9 @@ a[href] * {
   justify-content: center;
   min-width: 16px;
   min-height: 20px;
+  border-radius: 4px;
+  background: transparent;
+  transition: background-color 120ms ease;
 }
 .contents-row .row-signals:not(:empty) {
   margin-right: 4px;
@@ -2556,35 +2557,17 @@ a[href] * {
   cursor: pointer;
 }
 
-:root[data-theme="dark"] .signal-preview-target {
-  --marker-hover: color-mix(in srgb, var(--text) 12%, transparent);
-  --marker-hover-ring: none;
-}
 :root:not([data-theme="dark"]) .section-flyout .signal-preview-target {
-  --marker-hover: color-mix(in srgb, var(--toolbar-text) 14%, transparent);
-  --marker-hover-ring: inset 0 0 0 1px
-    color-mix(in srgb, var(--toolbar-text) 12%, transparent);
-}
-.signal-preview-target::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: 4px;
-  background: transparent;
-  transition:
-    background-color 120ms ease,
-    box-shadow 120ms ease;
+  --marker-hover: color-mix(in srgb, var(--toolbar-text) 12%, transparent);
 }
 @media (hover: hover) {
-  .signal-preview-target:hover::before,
-  .signal-preview-target[data-preview-open="true"]::before {
+  .signal-preview-target:hover,
+  .signal-preview-target[data-preview-open="true"] {
     background: var(--marker-hover);
-    box-shadow: var(--marker-hover-ring);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .signal-preview-target::before {
+  .signal-preview-target {
     transition: none;
   }
 }
@@ -2602,11 +2585,6 @@ a[href] * {
   .signal-preview .annotation-card:hover {
     background: var(--preview-card-hover);
     box-shadow: var(--preview-card-hover-shadow);
-  }
-}
-@media (hover: hover) {
-  :root:not([data-theme="dark"]) .signal-preview .annotation-card:hover {
-    border-color: #d7cab7;
   }
 }
 .signal-preview .annotation-card:has(.card-main:focus-visible) {
