@@ -1,8 +1,22 @@
 "use client";
 import type { Study } from "@/lib/study";
+import {
+  MIN_STUDY_ZOOM,
+  MAX_STUDY_ZOOM,
+  STUDY_ZOOM_STEP,
+} from "@/lib/reader-zoom";
 import { paper } from "@/lib/reader-model";
 import { useState } from "react";
-import { Check, Copy, Download, Minus, Plus } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  Minus,
+  Plus,
+  Monitor,
+  SunMedium,
+  Moon,
+} from "lucide-react";
 import type { Annotation } from "@/lib/annotations";
 import {
   kinds,
@@ -18,7 +32,13 @@ export function ViewMenu({
   onShowChange,
   onShortcuts,
   onClose,
+  studyZoom,
 }: {
+  studyZoom?: {
+    percent: number;
+    onChange: (percent: number) => void;
+    overflowing: boolean;
+  };
   showOnPage: ShowOnPage;
   onShowChange: (show: ShowOnPage) => void;
   onShortcuts: () => void;
@@ -36,7 +56,13 @@ export function ViewMenu({
           value,
           label: (
             <>
-              <span className={`theme-swatch ${value}`} />
+              {value === "auto" ? (
+                <Monitor size={14} aria-hidden="true" />
+              ) : value === "light" ? (
+                <SunMedium size={14} aria-hidden="true" />
+              ) : (
+                <Moon size={14} aria-hidden="true" />
+              )}
               {value[0].toUpperCase() + value.slice(1)}
             </>
           ),
@@ -45,30 +71,53 @@ export function ViewMenu({
       <p className="helper">Auto follows your system setting</p>
       <hr />
       <h2 className="eyebrow">Reading</h2>
-      <div className="setting-row">
-        <span>Note text</span>
-        <div className="stepper">
-          <button
-            aria-label="Smaller note text"
-            disabled={preferences.noteTextPx <= 13}
-            onClick={() =>
-              preferences.setNoteTextPx(preferences.noteTextPx - 1)
-            }
-          >
-            <Minus size={12} />
-          </button>
-          <output>{preferences.noteTextPx} px</output>
-          <button
-            aria-label="Larger note text"
-            disabled={preferences.noteTextPx >= 19}
-            onClick={() =>
-              preferences.setNoteTextPx(preferences.noteTextPx + 1)
-            }
-          >
-            <Plus size={12} />
-          </button>
-        </div>
-      </div>
+      {studyZoom && (
+        <>
+          <div className="setting-row">
+            <span>Study zoom</span>
+            <div
+              className="stepper study-zoom-stepper"
+              role="group"
+              aria-label="Study zoom"
+            >
+              <button
+                type="button"
+                aria-label="Zoom out study"
+                disabled={studyZoom.percent <= MIN_STUDY_ZOOM}
+                onClick={() =>
+                  studyZoom.onChange(studyZoom.percent - STUDY_ZOOM_STEP)
+                }
+              >
+                <Minus size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="zoom-reset"
+                aria-label="Reset study zoom to fit"
+                title="Reset to fit"
+                onClick={() => studyZoom.onChange(100)}
+              >
+                {studyZoom.percent}%
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom in study"
+                disabled={studyZoom.percent >= MAX_STUDY_ZOOM}
+                onClick={() =>
+                  studyZoom.onChange(studyZoom.percent + STUDY_ZOOM_STEP)
+                }
+              >
+                <Plus size={14} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <p className="helper zoom-helper">
+            {studyZoom.overflowing
+              ? "Scroll horizontally to explore the enlarged page."
+              : "Select the percentage to return to the default fit."}
+          </p>
+        </>
+      )}
       <p className="setting-label">Show on page</p>
       <div className="marker-chips">
         {kinds.map((kind) => (

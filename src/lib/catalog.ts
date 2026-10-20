@@ -1,8 +1,10 @@
+import projectWriteup from "./project-writeup.json";
 import type { Study } from "./study";
 import { studySections } from "./study-sections";
 import { paper } from "./reader-model";
 export type LibraryStudy = Study & { slug: string };
 export const studies: LibraryStudy[] = [
+  projectWriteup,
   { ...paper, slug: "neptune-odyssey" },
   ...[
     {

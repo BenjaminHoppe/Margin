@@ -1,0 +1,49 @@
+{
+  "id": "margin-project-writeup",
+  "slug": "margin-project-writeup",
+  "hash": "63cd1fca57919abbb75d78ee495b9cde22eeada2df2179971f6ba49d816ea310",
+  "title": "Margin - Project write-up",
+  "shortTitle": "Margin: Project write-up",
+  "subtitle": "Benjamin Hoppe · Project overview",
+  "url": "/papers/margin-project-writeup.pdf",
+  "pageCount": 1,
+  "fileName": "margin-project-writeup.pdf",
+  "sections": [
+    {
+      "title": "Overview",
+      "page": 1,
+      "depth": 0,
+      "y": 0.09343434343434344
+    },
+    {
+      "title": "The problem",
+      "page": 1,
+      "depth": 0,
+      "y": 0.19444444444444445
+    },
+    {
+      "title": "Key decisions",
+      "page": 1,
+      "depth": 0,
+      "y": 0.30997474747474746
+    },
+    {
+      "title": "Engineering choices",
+      "page": 1,
+      "depth": 0,
+      "y": 0.4902777777777778
+    },
+    {
+      "title": "Tradeoffs and assumptions",
+      "page": 1,
+      "depth": 0,
+      "y": 0.5892676767676768
+    },
+    {
+      "title": "With more time",
+      "page": 1,
+      "depth": 0,
+      "y": 0.6882575757575757
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import type { Annotation, Draft, Kind, Understanding } from "./annotations";
+import { studySeedAnnotations } from "./study-annotations";
 import { NEPTUNE, type Study, type Section } from "./study";
 export type AnnotationMode = "margin" | "list" | "hidden";
 export type MinimapMode = "map" | "contents";
@@ -150,7 +151,8 @@ const seedRows: [Kind, number, string, string, Understanding][] = [
     "unclear",
   ],
 ];
-export function seedAnnotations(): Annotation[] {
+export function seedAnnotations(study: Study = paper): Annotation[] {
+  if (study.id !== paper.id) return studySeedAnnotations(study.id);
   return seedRows.map(([kind, page, quote, body, understanding], i) => ({
     id: `seed-${i + 1}`,
     kind,
@@ -172,10 +174,10 @@ export function initialReaderState(study: Study = paper): ReaderState {
   return {
     version: 1,
     demoSeedVersion: 4,
-    annotations: neptune ? seedAnnotations() : [],
+    annotations: seedAnnotations(study),
     draft: null,
     position: { page: neptune ? 19 : 1, fraction: 0 },
-    minimap: "map",
+    minimap: study.id === "margin-project-writeup" ? "contents" : "map",
     mode: "margin",
     showOnPage: {
       highlight: true,
@@ -234,7 +236,18 @@ export function readReaderState(
 } {
   const defaults = initialReaderState(study);
   const withDemo = (annotations: Annotation[], revision?: number) => {
-    if (study.id !== paper.id || revision === 4) return annotations;
+    if (study.id !== paper.id) {
+      const existingIds = new Set(
+        annotations.map((annotation) => annotation.id),
+      );
+      return [
+        ...annotations,
+        ...seedAnnotations(study).filter(
+          (annotation) => !existingIds.has(annotation.id),
+        ),
+      ];
+    }
+    if (revision === 4) return annotations;
     // The extra layout samples are additive: preserve every existing v3 note,
     // including edited demo annotations and intentionally removed older seeds.
     const previous =

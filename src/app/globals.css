@@ -308,6 +308,7 @@ kbd {
   width: 100%;
   position: relative;
   --card-width: 300px;
+  --annotation-controls-width: 227px;
   --page-width: 600px;
   isolation: isolate;
 }
@@ -318,7 +319,10 @@ kbd {
   height: 84px;
   pointer-events: none;
   display: grid;
-  grid-template-columns: 1fr minmax(0, var(--page-width)) 1fr;
+  grid-template-columns: 1fr minmax(
+      0,
+      var(--navigation-page-width, var(--page-width))
+    ) 1fr;
   align-items: start;
   padding: 24px;
   column-gap: 20px;
@@ -364,15 +368,12 @@ kbd {
   opacity: 0;
   pointer-events: none;
 }
-.is-focused .reader-header h1 {
-  opacity: 0.45;
-}
 .annotations-control {
   position: fixed;
   z-index: 21;
   right: 24px;
   top: 68px;
-  width: 227px;
+  width: var(--annotation-controls-width);
   height: 78px;
   padding: 11px 5px 5px;
   background: var(--surface);
@@ -400,7 +401,8 @@ kbd {
   position: absolute;
   inset: 0;
   overflow: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
+  right: var(--reader-panel-inset, 0px);
   padding: 84px 0 32px;
   overscroll-behavior: contain;
   /* Fade the scrolling content itself. No painted header surface or blur edge. */
@@ -429,8 +431,10 @@ kbd {
 .paper-viewport > .react-pdf__Document {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 24px;
+  width: var(--document-width, 100%);
+  padding-left: var(--page-left, 0px);
   min-height: 100%;
 }
 .continuous-page {
@@ -707,15 +711,19 @@ kbd {
 }
 .empty-margin {
   position: fixed;
-  left: calc(50% + var(--page-width) / 2 + 40px);
-  top: 190px;
-  width: 300px;
+  right: 24px;
+  top: calc(50% + 26px);
+  width: var(--annotation-controls-width);
+  transform: translateY(-50%);
 }
 .empty-annotations {
   border: 1px dashed color-mix(in srgb, var(--faint) 60%, transparent);
   border-radius: 16px;
-  padding: 20px;
-  text-align: left;
+  padding: 16px;
+  text-align: center;
+}
+.empty-annotations .mini-toolbar {
+  margin-inline: auto;
 }
 .empty-annotations h3 {
   font-size: 14px;
@@ -725,7 +733,7 @@ kbd {
   font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
-  margin-bottom: 14px;
+  margin: 0;
 }
 .empty-annotations > div:last-child {
   font-size: 10px;
@@ -775,6 +783,7 @@ kbd {
   flex-direction: column;
   gap: 4px;
   height: 100%;
+  max-height: var(--minimap-natural-height, 100%);
   padding: 8px 0;
 }
 .chapter-segment {
@@ -2360,7 +2369,10 @@ button:not(.chapter-segment):not(.range-tick),
   position: absolute;
   top: 0;
   left: 4px;
-  width: min(360px, calc((100vw - var(--page-width)) / 2 - 42px));
+  width: min(
+    360px,
+    calc((100vw - var(--navigation-page-width, var(--page-width))) / 2 - 42px)
+  );
 }
 .rail-position {
   left: 26px;
@@ -3321,4 +3333,196 @@ a[href] * {
     color-mix(in srgb, var(--canvas) 16%, transparent) 72px,
     transparent 84px
   );
+}
+
+/* Small-screen handoff. The desktop reader mounts only at its usable width. */
+.mobile-only {
+  display: none;
+}
+.desktop-only {
+  height: 100%;
+}
+.mobile-desktop-prompt {
+  position: relative;
+  min-height: 100svh;
+  background: var(--canvas);
+  color: var(--text);
+  padding: max(56px, env(safe-area-inset-top)) 24px
+    max(24px, env(safe-area-inset-bottom));
+}
+.mobile-wordmark {
+  text-align: center;
+  font: 400 19px/24px var(--font-editorial);
+}
+.mobile-prompt-content {
+  position: absolute;
+  top: 37.4svh;
+  left: 24px;
+  right: 24px;
+  max-width: 420px;
+  margin-inline: auto;
+  text-align: center;
+}
+.mobile-prompt-content h1 {
+  width: 292px;
+  max-width: 100%;
+  height: 73px;
+  margin: 0 auto 20px;
+}
+.mobile-prompt-content h1 img {
+  max-width: 100%;
+  height: auto;
+}
+.mobile-prompt-description {
+  margin: 0 0 28px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 22px;
+}
+.mobile-link-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(31 23 13 / 5%);
+}
+.mobile-monitor {
+  flex: 0 0 16px;
+  margin-left: 12px;
+}
+.mobile-link-field input {
+  min-width: 0;
+  flex: 1;
+  width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 13.5px/20px var(--font-mono);
+  text-overflow: ellipsis;
+  outline-offset: 4px;
+}
+.mobile-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 96px;
+  width: 96px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--inverse);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mobile-copy-button:active {
+  opacity: 0.85;
+}
+.mobile-copy-icon {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+}
+.mobile-copy-status {
+  min-height: 40px;
+  margin: 16px 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+.mobile-light-asset {
+  display: block;
+}
+.mobile-dark-asset {
+  display: none;
+}
+:root[data-theme="dark"] .mobile-light-asset {
+  display: none;
+}
+:root[data-theme="dark"] .mobile-dark-asset {
+  display: block;
+}
+@media (max-width: 1099px) {
+  .mobile-only {
+    display: block;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .desktop-only {
+    display: none;
+  }
+}
+@media (max-height: 600px) {
+  .mobile-desktop-prompt {
+    min-height: 420px;
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+  .mobile-prompt-content {
+    position: relative;
+    inset: auto;
+    margin-top: 56px;
+  }
+}
+
+.study-zoom-stepper {
+  width: 132px;
+  height: 32px;
+}
+.study-zoom-stepper button {
+  width: 32px;
+  height: 32px;
+  color: var(--text);
+  border-radius: 8px;
+}
+.study-zoom-stepper .zoom-reset {
+  width: 68px;
+  font: 12px/16px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.study-zoom-stepper button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.view-menu .zoom-helper {
+  margin: -4px 0 16px;
+  color: var(--muted);
+}
+.view-menu .segmented button {
+  gap: 6px;
+}
+@media (hover: hover) {
+  .study-zoom-stepper button:not(:disabled):hover {
+    background: var(--current-row);
+  }
+}
+
+/* The List panel moves the PDF viewport's edge into the page-to-panel gap.
+   Keep that inner vertical scrollbar hidden without disabling page scrolling. */
+.mode-list .paper-viewport {
+  scrollbar-width: none;
+}
+@supports selector(::-webkit-scrollbar) {
+  .mode-list .paper-viewport {
+    scrollbar-width: auto;
+  }
+  .mode-list .paper-viewport::-webkit-scrollbar {
+    width: 0;
+    height: 8px;
+  }
+  .mode-list .paper-viewport::-webkit-scrollbar-thumb {
+    border: 2px solid var(--canvas);
+    border-radius: 999px;
+    background: var(--seg-unread);
+  }
+  .mode-list .paper-viewport::-webkit-scrollbar-track {
+    background: var(--canvas);
+  }
 }

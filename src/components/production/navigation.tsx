@@ -580,19 +580,16 @@ export function Navigation({
         0.001)
       ? destination
       : sectionForPosition(page, fraction, rows);
-  if (focus)
-    return (
-      <div className="focus-progress" aria-label={`${progress}% read`}>
-        <span>
-          <i style={{ height: `${progress}%` }} />
-        </span>
-        <small>{progress}%</small>
-      </div>
-    );
+  if (focus) return null;
   return (
     <>
       <nav
         className={`document-navigation is-${mode}`}
+        style={
+          {
+            "--minimap-natural-height": `${Math.max(pageCount * 40, chapters.length * 52 + 12)}px`,
+          } as CSSProperties
+        }
         aria-label="Document navigation"
         onMouseEnter={keep}
         onMouseLeave={leave}

@@ -24,7 +24,11 @@ import {
 } from "../src/lib/reader-model";
 import { studies } from "../src/lib/catalog";
 import { exportAnnotations } from "../src/lib/reader-export";
-import { locateQuote, normalizedQuote } from "../src/lib/quote-match";
+import {
+  locateQuote,
+  normalizedQuote,
+  type QuoteTextItem,
+} from "../src/lib/quote-match";
 
 test("new reader starts at printed page 8 with a complete seeded workflow", () => {
   const state = initialReaderState();
@@ -202,10 +206,16 @@ test("malformed saved drafts preserve the original storage for recovery", () => 
   assert.match(result.error, /preserved/);
 });
 
-test("each additional study starts empty and uses independent storage and page limits", () => {
-  for (const study of studies.slice(1)) {
+test("each additional study starts with all three annotation types and independent storage and page limits", () => {
+  for (const study of studies.filter(
+    (study) => study.id !== paper.id && study.id !== "margin-project-writeup",
+  )) {
     const state = readReaderState({ getItem: () => null }, study).state;
-    assert.equal(state.annotations.length, 0);
+    assert.equal(state.annotations.length, 3);
+    assert.deepEqual(
+      new Set(state.annotations.map((annotation) => annotation.kind)),
+      new Set(["highlight", "note", "question"]),
+    );
     assert.equal(state.position.page, 1);
     assert.notEqual(readerKey(study), READER_KEY);
     const sections = [{ title: "Paper", page: 1 }];
@@ -250,7 +260,7 @@ test("the new demo is added once while preserving personal annotations and draft
 });
 test("all library PDFs exist with the catalogued page counts", async () => {
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  assert.equal(studies.length, 11);
+  assert.equal(studies.length, 12);
   assert.equal(new Set(studies.map((s) => s.slug)).size, studies.length);
   for (const study of studies) {
     const pdf = await getDocument({
@@ -554,4 +564,119 @@ test("cancelled and deleted editors leave no empty card or connector", () => {
   );
   assert.doesNotMatch(hidden, /margin-column|connector|annotation-card/);
   assert.match(hidden, /range-tick highlight/);
+});
+
+test("every additional study seed is anchored to its actual quoted passage", async () => {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const ids = new Set<string>();
+  for (const study of studies.filter(
+    (study) => study.id !== paper.id && study.id !== "margin-project-writeup",
+  )) {
+    const pdf = await getDocument({
+      data: new Uint8Array(
+        await readFile(new URL(`../public${study.url}`, import.meta.url)),
+      ),
+      useSystemFonts: true,
+    }).promise;
+    try {
+      for (const annotation of seedAnnotations(study)) {
+        assert.ok(
+          !ids.has(annotation.id),
+          `Duplicate sample ID: ${annotation.id}`,
+        );
+        ids.add(annotation.id);
+        assert.ok(annotation.page >= 1 && annotation.page <= study.pageCount);
+        assert.ok(
+          annotation.rects.length > 0,
+          `${study.shortTitle}: missing precomputed coordinates`,
+        );
+        const page = await pdf.getPage(annotation.page);
+        const viewport = page.getViewport({ scale: 1 });
+        const text = await page.getTextContent();
+        const matched = locateQuote(
+          text.items as QuoteTextItem[],
+          annotation.quote,
+          viewport.width,
+          viewport.height,
+        );
+        assert.equal(
+          matched.length,
+          annotation.rects.length,
+          `${study.shortTitle}: ${annotation.quote}`,
+        );
+        matched.forEach((rect, index) => {
+          for (const key of ["x", "y", "width", "height"] as const)
+            assert.ok(
+              Math.abs(rect[key] - annotation.rects[index][key]) <= 0.000001,
+            );
+          assert.ok(
+            rect.x >= 0 &&
+              rect.y >= 0 &&
+              rect.x + rect.width <= 1 &&
+              rect.y + rect.height <= 1,
+          );
+        });
+        assert.equal(
+          annotation.kind === "highlight"
+            ? annotation.body
+            : annotation.body.trim().length > 0,
+          annotation.kind === "highlight" ? "" : true,
+        );
+      }
+    } finally {
+      await pdf.destroy();
+    }
+  }
+  assert.equal(ids.size, 30);
+});
+
+test("new study samples merge once without overwriting existing notes or reader preferences", () => {
+  for (const study of studies.filter(
+    (study) => study.id !== paper.id && study.id !== "margin-project-writeup",
+  )) {
+    const defaults = initialReaderState(study);
+    const edited = {
+      ...defaults.annotations[1],
+      body: "Keep my edited sample note",
+    };
+    const personal = {
+      ...edited,
+      id: "personal",
+      body: "Keep my personal note",
+    };
+    const previous = {
+      ...defaults,
+      annotations: [edited, personal],
+      mode: "hidden" as const,
+      position: { page: 2, fraction: 0.4 },
+      draft: { ...personal },
+    };
+    const first = readReaderState(
+      {
+        getItem: (key) =>
+          key === readerKey(study) ? JSON.stringify(previous) : null,
+      },
+      study,
+    ).state;
+    assert.equal(first.annotations.length, 4);
+    assert.deepEqual(
+      first.annotations.find((annotation) => annotation.id === edited.id),
+      edited,
+    );
+    assert.deepEqual(
+      first.annotations.find((annotation) => annotation.id === personal.id),
+      personal,
+    );
+    assert.deepEqual(first.position, previous.position);
+    assert.equal(first.mode, "hidden");
+    assert.deepEqual(first.draft, previous.draft);
+    const second = readReaderState(
+      {
+        getItem: (key) =>
+          key === readerKey(study) ? JSON.stringify(first) : null,
+      },
+      study,
+    ).state;
+    assert.deepEqual(second.annotations, first.annotations);
+  }
 });

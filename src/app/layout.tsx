@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { ScreenSizeGate } from "@/components/production/screen-size-gate";
 import { PreferencesProvider } from "@/components/production/preferences";
 import "./globals.css";
 const sans = localFont({
@@ -84,7 +85,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <PreferencesProvider>{children}</PreferencesProvider>
+        <PreferencesProvider>
+          <ScreenSizeGate>{children}</ScreenSizeGate>
+        </PreferencesProvider>
       </body>
     </html>
   );

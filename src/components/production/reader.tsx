@@ -1,4 +1,6 @@
 "use client";
+import { readerPageLayout } from "@/lib/reader-zoom";
+import { usePreferences } from "./preferences";
 import type { Study } from "@/lib/study";
 import Link from "next/link";
 import { flushSync } from "react-dom";
@@ -40,6 +42,7 @@ import { Navigation } from "./navigation";
 import { copyExport, ExportMenu, ViewMenu } from "./menus";
 import { Presence, Segmented, Shortcuts, Toast } from "./ui";
 export default function Reader({ study: paper }: { study: Study }) {
+  const preferences = usePreferences();
   const neptune = paper.id === neptunePaper.id;
   const storageKey = readerKey(paper);
   const [initial] = useState(() => {
@@ -88,13 +91,17 @@ export default function Reader({ study: paper }: { study: Study }) {
   const focusButton = useRef<HTMLButtonElement>(null);
   const exitButton = useRef<HTMLButtonElement>(null);
   const lastWidth = useRef(0);
-  const width = Math.round(
-    screenWidth < 1100
-      ? Math.min(600, screenWidth - 48)
-      : Math.max(520, Math.min(760, (screenWidth * 5) / 12)),
-  );
   const mode: AnnotationMode =
     screenWidth < 1100 && saved.mode === "margin" ? "hidden" : saved.mode;
+  const layout = readerPageLayout(screenWidth, preferences.studyZoomPercent, {
+    margin:
+      (!focus && mode === "margin") ||
+      (mode !== "list" && Boolean(saved.draft || peek)),
+    list: !focus && mode === "list",
+    contents: saved.minimap === "contents",
+    focus,
+  });
+  const { width } = layout;
   useLayoutEffect(() => {
     savedRef.current = saved;
   }, [saved]);
@@ -172,6 +179,31 @@ export default function Reader({ study: paper }: { study: Study }) {
     if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
     setAnimateProgress(false);
   }, []);
+  function changeStudyZoom(percent: number) {
+    interruptJump();
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = null;
+    const root = viewport.current;
+    if (root) {
+      const top = root.scrollTop + 84;
+      const anchor = pageGeometry.current.find(
+        (page) => page.top + page.height > top,
+      );
+      if (anchor)
+        setSaved((old) => ({
+          ...old,
+          position: {
+            page: anchor.page,
+            fraction: Math.max(
+              0,
+              Math.min(1, (top - anchor.top) / anchor.height),
+            ),
+          },
+        }));
+    }
+    clearSelection();
+    preferences.setStudyZoomPercent(percent);
+  }
   const jump = useCallback(
     (page: number, fraction = 0, smooth = true) => {
       const root = viewport.current;
@@ -808,7 +840,15 @@ export default function Reader({ study: paper }: { study: Study }) {
   return (
     <div
       className={`production-reader ${focus ? "is-focused" : ""} mode-${mode}`}
-      style={{ "--page-width": `${width}px` } as CSSProperties}
+      style={
+        {
+          "--page-width": `${width}px`,
+          "--navigation-page-width": `${layout.baseWidth}px`,
+          "--page-left": `${layout.left}px`,
+          "--document-width": `${layout.contentWidth}px`,
+          "--reader-panel-inset": `${layout.panelInset}px`,
+        } as CSSProperties
+      }
     >
       <header className="reader-header">
         <div className="header-start chrome">
@@ -961,6 +1001,11 @@ export default function Reader({ study: paper }: { study: Study }) {
       )}
       <Presence open={menu === "view"}>
         <ViewMenu
+          studyZoom={{
+            percent: preferences.studyZoomPercent,
+            onChange: changeStudyZoom,
+            overflowing: layout.overflowing,
+          }}
           showOnPage={saved.showOnPage}
           onShowChange={(showOnPage) =>
             setSaved((old) => ({ ...old, showOnPage }))
