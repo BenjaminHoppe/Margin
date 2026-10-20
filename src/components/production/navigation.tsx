@@ -103,7 +103,7 @@ function RowSignals({
         return (
           <span
             key={kind}
-            className={preview ? "signal-preview-target" : undefined}
+            className={preview ? `signal-preview-target ${kind}` : undefined}
             data-preview-open={hover?.kind === kind}
             role="img"
             aria-label={label}

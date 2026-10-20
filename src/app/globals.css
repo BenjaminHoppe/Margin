@@ -18,6 +18,11 @@
   --seg-unread: #ccc8bf;
   --seg-active-empty: #807a70;
   --current-row: #ece8e0;
+  --minimap-current: #ddd6ca;
+  --minimap-hover: color-mix(in srgb, #9b805a 8%, transparent);
+  --preview-card-hover: #f0ebe2;
+  --preview-card-hover-shadow: var(--e1);
+  --list-row-hover: #f0ebe2;
   --highlight: #f2c94c;
   --highlight-soft: #fdf3c8;
   --note: #5b8def;
@@ -65,6 +70,11 @@
   --seg-unread: #463b2e;
   --seg-active-empty: #94846f;
   --current-row: #40362b;
+  --minimap-current: var(--current-row);
+  --minimap-hover: color-mix(in srgb, var(--text) 5%, transparent);
+  --preview-card-hover: var(--current-row);
+  --preview-card-hover-shadow: var(--e2);
+  --list-row-hover: var(--surface-2);
   --highlight-soft: color-mix(in srgb, #fdf3c8 22%, #2a221a);
   --note-soft: color-mix(in srgb, #e6eeff 22%, #2a221a);
   --question-soft: color-mix(in srgb, #fdebdd 22%, #2a221a);
@@ -905,7 +915,7 @@ kbd {
   flex-direction: column;
   padding: 8px 4px 4px;
   border-radius: 16px;
-  --flyout-row-current: #ffffff17;
+  --flyout-row-current: #ffffff24;
   --flyout-row-hover: #ffffff0d;
   background: var(--flyout-surface);
   color: var(--flyout-text);
@@ -1948,7 +1958,7 @@ kbd {
   }
   .chapter-segment:hover::before,
   .chapter-segment[data-flyout-open="true"]::before {
-    background: color-mix(in srgb, var(--text) 5%, transparent);
+    background: var(--minimap-hover);
   }
   .contents-row:not(.current):hover {
     background: color-mix(in srgb, var(--surface-2) 60%, transparent);
@@ -1960,7 +1970,7 @@ kbd {
     background: var(--flyout-row-hover);
   }
   .list-row:hover {
-    background: var(--surface-2);
+    background: var(--list-row-hover);
   }
   .list-row.active:hover {
     background: var(--surface);
@@ -2494,6 +2504,9 @@ a[href] * {
 
 /* Hover previews are portaled beyond the masked sidebar scroller. */
 .signal-preview-target {
+  --marker-hover: color-mix(in srgb, var(--signal) 18%, transparent);
+  --marker-hover-ring: inset 0 0 0 1px
+    color-mix(in srgb, var(--signal) 30%, transparent);
   position: relative;
   isolation: isolate;
   display: inline-flex;
@@ -2543,6 +2556,15 @@ a[href] * {
   cursor: pointer;
 }
 
+:root[data-theme="dark"] .signal-preview-target {
+  --marker-hover: color-mix(in srgb, var(--text) 12%, transparent);
+  --marker-hover-ring: none;
+}
+:root:not([data-theme="dark"]) .section-flyout .signal-preview-target {
+  --marker-hover: color-mix(in srgb, var(--toolbar-text) 14%, transparent);
+  --marker-hover-ring: inset 0 0 0 1px
+    color-mix(in srgb, var(--toolbar-text) 12%, transparent);
+}
 .signal-preview-target::before {
   content: "";
   position: absolute;
@@ -2550,12 +2572,15 @@ a[href] * {
   z-index: -1;
   border-radius: 4px;
   background: transparent;
-  transition: background-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 @media (hover: hover) {
   .signal-preview-target:hover::before,
   .signal-preview-target[data-preview-open="true"]::before {
-    background: color-mix(in srgb, var(--text) 12%, transparent);
+    background: var(--marker-hover);
+    box-shadow: var(--marker-hover-ring);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2575,12 +2600,17 @@ a[href] * {
 
 @media (hover: hover) {
   .signal-preview .annotation-card:hover {
-    background: var(--current-row);
-    box-shadow: var(--e2);
+    background: var(--preview-card-hover);
+    box-shadow: var(--preview-card-hover-shadow);
+  }
+}
+@media (hover: hover) {
+  :root:not([data-theme="dark"]) .signal-preview .annotation-card:hover {
+    border-color: #d7cab7;
   }
 }
 .signal-preview .annotation-card:has(.card-main:focus-visible) {
-  background: var(--current-row);
+  background: var(--preview-card-hover);
   border-color: var(--muted);
 }
 
@@ -2648,7 +2678,7 @@ a[href] * {
 }
 
 .chapter-segment.current::before {
-  background: var(--current-row);
+  background: var(--minimap-current);
 }
 .chapter-segment.current .chapter-track {
   background: var(--seg-active-empty);
@@ -2986,4 +3016,9 @@ a[href] * {
   .annotation-action-popover {
     animation: none;
   }
+}
+
+/* Keep yellow readable on the warm light-mode rail without changing its fill. */
+:root:not([data-theme="dark"]) .minimap-rail .rail-marker.highlight {
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, #806017 48%, transparent);
 }
