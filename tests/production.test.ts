@@ -1,3 +1,9 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import {
+  AnnotationPageLayer,
+  AnnotationCard,
+} from "../src/components/production/annotation-layers";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -93,6 +99,7 @@ test("exports include sections, printed labels and question status, with optiona
   assert.equal(question.page, "8");
   assert.equal(question.status, "open");
   assert.equal("quote" in question, false);
+  assert.equal("understanding" in question, false);
   const md = exportAnnotations(
     seed,
     "md",
@@ -103,6 +110,7 @@ test("exports include sections, printed labels and question status, with optiona
   );
   assert.match(md, /Triton as an Ocean World · p\. 8/);
   assert.match(md, /Status: open/);
+  assert.doesNotMatch(md, /Understanding:/);
   assert.match(md, /Exported from Margin · 2026-10-19/);
   const csv = exportAnnotations(
     [{ ...seed[0], body: 'A "quote", and\na newline' }],
@@ -408,4 +416,128 @@ test("session-only content resets additions and drafts while retaining reader pr
   assert.equal(restored.minimap, "contents");
   assert.deepEqual(restored.position, session.position);
   assert.equal(session.annotations[0].id, "personal");
+});
+
+test("cancelled and deleted editors leave no empty card or connector", () => {
+  const annotation = {
+    ...seedAnnotations()[0],
+    kind: "highlight" as const,
+    body: "",
+    rects: [{ x: 0.1, y: 0.2, width: 0.5, height: 0.025 }],
+  };
+  const noop = () => {};
+  const props = {
+    annotations: [annotation],
+    page: annotation.page,
+    height: 1000,
+    near: true,
+    mode: "margin" as const,
+    focus: false,
+    peek: null,
+    active: annotation.id,
+    show: { highlight: true, note: true, question: true, understanding: false },
+    labels: null,
+    draft: null,
+    onDraftChange: noop,
+    onDraftTypeChange: noop,
+    onDraftCancel: noop,
+    onDraftSave: noop,
+    onOpen: noop,
+    onClosePeek: noop,
+    onShowMargin: noop,
+    onEdit: noop,
+    onDelete: noop,
+  };
+  const editing = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, {
+      ...props,
+      draft: { ...annotation, body: "Unsaved text", kind: "note" },
+    }),
+  );
+  assert.match(editing, /inline-composer/);
+  assert.match(editing, /range-tick note/);
+  const cancelled = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, { ...props, active: null }),
+  );
+  assert.doesNotMatch(cancelled, /inline-composer|Unsaved text|draft-card/);
+  assert.match(cancelled, /Add note/);
+  assert.doesNotMatch(cancelled, /<kbd>\/<\/kbd>/);
+  assert.match(cancelled, /<div class="card-main"/);
+  assert.doesNotMatch(cancelled, /<button class="card-main"/);
+  const preview = renderToStaticMarkup(
+    createElement(AnnotationCard, {
+      annotation,
+      labels: null,
+      preview: true,
+      onOpen: noop,
+    }),
+  );
+  assert.match(preview, /<button class="card-main"/);
+
+  const withExistingText = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, {
+      ...props,
+      annotations: [{ ...annotation, body: "Keep this existing text" }],
+    }),
+  );
+  assert.match(withExistingText, /Keep this existing text/);
+  assert.match(withExistingText, /Add note/);
+  for (const kind of ["note", "question"] as const) {
+    const writingCard = renderToStaticMarkup(
+      createElement(AnnotationCard, {
+        annotation: { ...annotation, kind, body: "Keep my words" },
+        labels: null,
+        onEdit: noop,
+        onDelete: noop,
+      }),
+    );
+    assert.match(writingCard, /Keep writing/);
+    assert.match(writingCard, /Keep my words/);
+    assert.doesNotMatch(writingCard, /Open question|question-status/);
+  }
+
+  assert.match(cancelled, /range-tick highlight/);
+  const second = {
+    ...annotation,
+    id: "second-highlight",
+    rects: [{ ...annotation.rects[0], y: 0.5 }],
+  };
+  const multiple = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, {
+      ...props,
+      annotations: [annotation, second],
+      active: second.id,
+    }),
+  );
+  assert.equal((multiple.match(/card-add-note/g) ?? []).length, 2);
+  assert.equal((multiple.match(/<kbd>\/<\/kbd>/g) ?? []).length, 1);
+  const crowded = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, {
+      ...props,
+      annotations: Array.from({ length: 6 }, (_, i) => ({
+        ...annotation,
+        id: `crowded-${i}`,
+        rects: [{ ...annotation.rects[0], y: 0.1 + i * 0.08 }],
+      })),
+    }),
+  );
+  assert.equal((crowded.match(/class="annotation-card /g) ?? []).length, 6);
+  assert.doesNotMatch(crowded, /overflow-chip|\+3 here/);
+
+  const deleted = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, {
+      ...props,
+      annotations: [],
+      active: null,
+    }),
+  );
+  assert.doesNotMatch(
+    deleted,
+    /margin-column|connector|range-tick|annotation-card/,
+  );
+  const hidden = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, { ...props, mode: "hidden" }),
+  );
+  assert.doesNotMatch(hidden, /margin-column|connector|annotation-card/);
+  assert.match(hidden, /range-tick highlight/);
 });

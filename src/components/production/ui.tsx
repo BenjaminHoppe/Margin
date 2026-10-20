@@ -192,11 +192,8 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
     [
       "Annotate · card selected",
       [
-        ["Change annotation type", "← →"],
-        ["Change understanding", "↑ ↓"],
-        ["Start writing", "Type"],
-        ["Return from text to controls", "Esc"],
-        ["Cancel from controls", "Esc"],
+        ["Write on active annotation", "/"],
+        ["Cancel annotation", "Esc"],
         ["Save", `${cmd} ↵`],
       ],
     ],

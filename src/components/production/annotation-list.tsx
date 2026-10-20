@@ -8,7 +8,7 @@ import {
   sortedAnnotations,
   type OutlineSection,
 } from "@/lib/reader-model";
-import { EmptyAnnotations, UnderstandingStatus } from "./annotation-layers";
+import { EmptyAnnotations } from "./annotation-layers";
 export function AnnotationList({
   annotations,
   sections,
@@ -168,11 +168,6 @@ export function AnnotationList({
                   </span>
                   <span className="list-quote">“{a.quote}”</span>
                   {a.body && <span className="list-body">{a.body}</span>}
-                  <UnderstandingStatus
-                    value={a.understanding}
-                    question={a.kind === "question"}
-                    resolved={a.resolved}
-                  />
                   {!a.rects.length && (
                     <small className="location-note">Location not found</small>
                   )}

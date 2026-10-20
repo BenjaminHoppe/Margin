@@ -71,7 +71,7 @@ export function ViewMenu({
       </div>
       <p className="setting-label">Show on page</p>
       <div className="marker-chips">
-        {[...kinds, "understanding" as const].map((kind) => (
+        {kinds.map((kind) => (
           <button
             key={kind}
             className={`chip ${showOnPage[kind] ? "on" : ""}`}
@@ -81,13 +81,11 @@ export function ViewMenu({
             }
           >
             <i className={`signal ${kind}`} />
-            {kind === "understanding"
-              ? "Understanding"
-              : kind === "highlight"
-                ? "Highlights"
-                : kind === "note"
-                  ? "Notes"
-                  : "Questions"}
+            {kind === "highlight"
+              ? "Highlights"
+              : kind === "note"
+                ? "Notes"
+                : "Questions"}
           </button>
         ))}
       </div>

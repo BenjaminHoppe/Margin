@@ -27,12 +27,6 @@ export function exportAnnotations(
     page: pageLabel(a.page, labels),
     ...(includeQuotes ? { quote: a.quote } : {}),
     body: a.body,
-    understanding:
-      a.understanding === "unmarked"
-        ? "none"
-        : a.understanding === "partly understood"
-          ? "partial"
-          : a.understanding,
     status: a.kind === "question" ? (a.resolved ? "resolved" : "open") : "",
     createdAt: a.createdAt,
     rects: a.rects,
@@ -45,7 +39,6 @@ export function exportAnnotations(
       "page",
       ...(includeQuotes ? ["quote"] : []),
       "body",
-      "understanding",
       "status",
       "createdAt",
     ] as const;
@@ -75,10 +68,7 @@ export function exportAnnotations(
           .map((l) => `> ${l}`)
           .join("\n"),
       );
-    lines.push(
-      `- **${kindLabel[row.type]}:** ${row.body}`,
-      `- Understanding: ${row.understanding}`,
-    );
+    lines.push(`- **${kindLabel[row.type]}:** ${row.body}`);
     if (row.status) lines.push(`- Status: ${row.status}`);
   });
   return lines.join("\n\n");

@@ -1,6 +1,7 @@
 "use client";
 import type { Study } from "@/lib/study";
 import Link from "next/link";
+import { flushSync } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -13,15 +14,12 @@ import {
 import { ChevronLeft, Download, Focus, SlidersHorizontal } from "lucide-react";
 import PdfView from "../pdf-view";
 import {
-  UNDERSTANDINGS,
   inferAnnotationKind,
   isDraftDirty,
-  annotationArrowAction,
   type Annotation,
   type Draft,
   type Kind,
   type Rect,
-  type Understanding,
 } from "@/lib/annotations";
 import { exportAnnotations } from "@/lib/reader-export";
 import {
@@ -37,7 +35,7 @@ import {
 } from "@/lib/reader-model";
 import { AnnotationPageLayer, EmptyAnnotations } from "./annotation-layers";
 import { AnnotationList } from "./annotation-list";
-import { SelectionToolbar, type TextSelection } from "./annotating";
+import { type TextSelection } from "./annotating";
 import { Navigation } from "./navigation";
 import { copyExport, ExportMenu, ViewMenu } from "./menus";
 import { Presence, Segmented, Shortcuts, Toast } from "./ui";
@@ -352,40 +350,48 @@ export default function Reader({ study: paper }: { study: Study }) {
         return;
       }
       manualDraftType.current = null;
+      const now = new Date().toISOString();
+      const annotation: Annotation = {
+        id: crypto.randomUUID(),
+        page: selected.page,
+        quote: selected.quote,
+        rects: selected.rects,
+        kind: "highlight",
+        understanding: "unmarked",
+        body: "",
+        resolved: false,
+        createdAt: now,
+        updatedAt: now,
+      };
       setSelection(selected);
-      const { page, quote, rects } = selected;
+      setPeek(null);
       setSaved((old) => ({
         ...old,
-        draft: {
-          page,
-          quote,
-          rects,
-          kind: "highlight",
-          understanding: "unmarked",
-          body: "",
-          resolved: false,
-        },
+        annotations: [...old.annotations, annotation],
+        active: annotation.id,
+        draft: null,
       }));
       if (editorFocusFrame.current !== null)
         cancelAnimationFrame(editorFocusFrame.current);
       editorFocusFrame.current = requestAnimationFrame(() => {
         editorFocusFrame.current = null;
         window.getSelection()?.removeAllRanges();
-        document
-          .querySelector<HTMLFormElement>(".inline-composer")
+        viewport.current
+          ?.querySelector<HTMLButtonElement>(
+            `[data-card-id="${annotation.id}"] .card-add-note`,
+          )
           ?.focus({ preventScroll: true });
       });
+      announce("Highlight saved. Press slash to add a note or question.");
     },
     [announce],
   );
-  const begin = useCallback((kind: Kind, understanding?: Understanding) => {
-    // Re-clicking the default option is not an intentional type override.
-    if (savedRef.current.draft?.kind !== kind) manualDraftType.current = kind;
+  const begin = useCallback((kind: Kind) => {
+    // Every explicit choice remains authoritative over text inference.
+    manualDraftType.current = kind;
     setSaved((old) => ({
       ...old,
-      draft: old.draft
-        ? { ...old.draft, kind, ...(understanding ? { understanding } : {}) }
-        : null,
+      draft: old.draft ? { ...old.draft, kind } : null,
     }));
     if (kind !== "highlight")
       requestAnimationFrame(() =>
@@ -408,10 +414,55 @@ export default function Reader({ study: paper }: { study: Study }) {
       cancelAnimationFrame(editorFocusFrame.current);
     editorFocusFrame.current = null;
     manualDraftType.current = null;
-    setSaved((old) => ({ ...old, draft: null }));
-    clearSelection();
+    flushSync(() => {
+      setSaved((old) => ({ ...old, draft: null, active: null }));
+      setPeek(null);
+      setSelection(null);
+    });
+    window.getSelection()?.removeAllRanges();
     viewport.current?.focus({ preventScroll: true });
   }, []);
+  const focusEditor = useCallback(
+    (annotation: Pick<Annotation, "page" | "rects">) => {
+      jump(
+        annotation.page,
+        Math.max(0, (annotation.rects[0]?.y ?? 0) - 0.15),
+        false,
+      );
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
+      let attempts = 0;
+      const focusWhenMounted = () => {
+        editorFocusFrame.current = null;
+        const textarea = viewport.current?.querySelector<HTMLTextAreaElement>(
+          `[data-page="${annotation.page}"] .inline-composer textarea`,
+        );
+        if (!textarea) {
+          if (++attempts < 30)
+            editorFocusFrame.current = requestAnimationFrame(focusWhenMounted);
+          return;
+        }
+        const root = viewport.current;
+        const form = textarea.form;
+        if (root && form) {
+          const bounds = form.getBoundingClientRect();
+          const viewportBounds = root.getBoundingClientRect();
+          const minimumTop = viewportBounds.top + 96;
+          const maximumBottom = viewportBounds.bottom - 24;
+          const offset =
+            bounds.top < minimumTop
+              ? bounds.top - minimumTop
+              : bounds.bottom > maximumBottom
+                ? bounds.bottom - maximumBottom
+                : 0;
+          if (offset) root.scrollBy({ top: offset, behavior: "instant" });
+        }
+        textarea.focus({ preventScroll: true });
+      };
+      editorFocusFrame.current = requestAnimationFrame(focusWhenMounted);
+    },
+    [jump],
+  );
   const editAnnotation = useCallback(
     (annotation: Annotation) => {
       if (isDraftDirty(savedRef.current.draft, savedRef.current.annotations)) {
@@ -420,7 +471,8 @@ export default function Reader({ study: paper }: { study: Study }) {
         );
         return;
       }
-      manualDraftType.current = annotation.kind;
+      manualDraftType.current =
+        annotation.kind === "highlight" ? null : annotation.kind;
       clearSelection();
       setPeek(null);
       setSaved((old) => ({
@@ -428,30 +480,27 @@ export default function Reader({ study: paper }: { study: Study }) {
         active: annotation.id,
         draft: { ...annotation },
       }));
-      if (editorFocusFrame.current !== null)
-        cancelAnimationFrame(editorFocusFrame.current);
-      editorFocusFrame.current = requestAnimationFrame(() => {
-        editorFocusFrame.current = null;
-        document
-          .querySelector<HTMLElement>(
-            annotation.body ? ".inline-composer textarea" : ".inline-composer",
-          )
-          ?.focus({ preventScroll: true });
-      });
+      focusEditor(annotation);
     },
-    [announce],
+    [announce, focusEditor],
   );
   const deleteAnnotation = useCallback(
     (annotation: Annotation) => {
-      setSaved((old) => ({
-        ...old,
-        annotations: old.annotations.filter(
-          (item) => item.id !== annotation.id,
-        ),
-        active: old.active === annotation.id ? null : old.active,
-        draft: old.draft?.id === annotation.id ? null : old.draft,
-      }));
-      setPeek((old) => (old === annotation.id ? null : old));
+      flushSync(() => {
+        setSaved((old) => ({
+          ...old,
+          annotations: old.annotations.filter(
+            (item) => item.id !== annotation.id,
+          ),
+          active: old.active === annotation.id ? null : old.active,
+          draft: old.draft?.id === annotation.id ? null : old.draft,
+        }));
+        setPeek((old) => (old === annotation.id ? null : old));
+      });
+      clearSelection();
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
+      editorFocusFrame.current = null;
       announce(
         `${annotation.kind[0].toUpperCase() + annotation.kind.slice(1)} deleted`,
       );
@@ -487,13 +536,13 @@ export default function Reader({ study: paper }: { study: Study }) {
       draft: null,
       active: a.id,
     }));
-    if (focus || mode === "hidden") setPeek(a.id);
+    setPeek(null);
     announce(
       `${a.kind === "question" ? "Question" : a.kind === "note" ? "Note" : "Highlight"} saved`,
     );
     clearSelection();
     viewport.current?.focus({ preventScroll: true });
-  }, [saved.draft, focus, mode, announce]);
+  }, [saved.draft, announce]);
   function toggleFocus() {
     setMenu(null);
     setSelection(null);
@@ -504,13 +553,18 @@ export default function Reader({ study: paper }: { study: Study }) {
     if (focus) exitButton.current?.focus({ preventScroll: true });
   }, [focus]);
   useEffect(() => {
-    const selected = () => {
-      if (window.getSelection()?.isCollapsed && !savedRef.current.draft)
-        setSelection(null);
+    if (!selection) return;
+    const dismiss = (event: PointerEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".selection-toolbar")
+      )
+        return;
+      setSelection(null);
     };
-    document.addEventListener("selectionchange", selected);
-    return () => document.removeEventListener("selectionchange", selected);
-  }, []);
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [selection]);
   useEffect(() => {
     const event = (e: CustomEvent<number>) => jump(e.detail);
     const listener = (e: Event) => event(e as CustomEvent<number>);
@@ -542,26 +596,18 @@ export default function Reader({ study: paper }: { study: Study }) {
       if (typing) return;
       const key = e.key.toLowerCase();
       const cmd = e.metaKey || e.ctrlKey;
-      if (saved.draft && !cmd && !e.altKey) {
-        const action = annotationArrowAction(
-          saved.draft.kind,
-          saved.draft.understanding,
-          e.key,
-        );
-        if (action) {
+      if (key === "/" && !cmd && !e.altKey) {
+        if (saved.draft) {
           e.preventDefault();
-          if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-            // Keep focus on the controls while cycling; typing enters the field.
-            manualDraftType.current = action.kind;
-            setSaved((old) => ({
-              ...old,
-              draft: old.draft ? { ...old.draft, kind: action.kind } : null,
-            }));
-          } else
-            changeDraft({
-              ...saved.draft,
-              understanding: action.understanding,
-            });
+          focusEditor(saved.draft);
+          return;
+        }
+        const annotation = saved.annotations.find(
+          (item) => item.id === saved.active,
+        );
+        if (annotation) {
+          e.preventDefault();
+          editAnnotation(annotation);
           return;
         }
       }
@@ -610,30 +656,7 @@ export default function Reader({ study: paper }: { study: Study }) {
         return;
       }
       if (e.altKey) return;
-      if (selection && ["h", "n", "q", "u"].includes(key)) {
-        e.preventDefault();
-        begin(
-          key === "n" ? "note" : key === "q" ? "question" : "highlight",
-          key === "u" ? "understood" : "unmarked",
-        );
-        return;
-      }
-      if (key === "u" && saved.draft) {
-        e.preventDefault();
-        setSaved((old) => ({
-          ...old,
-          draft: old.draft
-            ? {
-                ...old.draft,
-                understanding:
-                  UNDERSTANDINGS[
-                    (UNDERSTANDINGS.indexOf(old.draft.understanding) + 1) % 4
-                  ],
-              }
-            : null,
-        }));
-        return;
-      }
+      if (saved.draft) return;
       if (window.getSelection()?.toString()) return;
       if (key === "f") {
         e.preventDefault();
@@ -700,10 +723,6 @@ export default function Reader({ study: paper }: { study: Study }) {
                 mode: screenWidth < 1100 ? "list" : "margin",
               }));
               setPeek(null);
-            }}
-            onOverflow={(page) => {
-              setSaved((old) => ({ ...old, mode: "list" }));
-              setPageFilter(page);
             }}
             onEdit={editAnnotation}
             onDelete={deleteAnnotation}
@@ -887,14 +906,6 @@ export default function Reader({ study: paper }: { study: Study }) {
         <aside className="empty-margin">
           <EmptyAnnotations />
         </aside>
-      )}
-      {selection && saved.draft && (
-        <SelectionToolbar
-          selection={selection}
-          kind={saved.draft.kind}
-          onCreate={begin}
-          onSave={saveDraft}
-        />
       )}
       <Presence open={menu === "view"}>
         <ViewMenu

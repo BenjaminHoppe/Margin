@@ -16,7 +16,7 @@
   --border: rgba(26, 26, 25, 0.06);
   --seg-read: #85827c;
   --seg-unread: #ccc8bf;
-  --seg-active-empty: #807a70;
+  --seg-active-empty: #bcb5a9;
   --current-row: #ece8e0;
   --minimap-current: #ddd6ca;
   --minimap-hover: color-mix(in srgb, #9b805a 8%, transparent);
@@ -574,7 +574,7 @@ kbd {
   background: var(--surface);
   border-radius: 14px;
   box-shadow: var(--e1);
-  animation: card-in 200ms var(--ease);
+  animation: none;
   overflow: hidden;
 }
 .annotation-card.active {
@@ -626,7 +626,7 @@ kbd {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.understanding-status {
+.question-status {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -818,19 +818,15 @@ kbd {
   overflow: hidden;
   clip-path: inset(0 round 4px);
 }
-:root[data-theme="dark"] .chapter-track > i,
-:root[data-theme="dark"] .contents-spine > i {
-  background: var(--muted);
-}
-:root[data-theme="dark"] .chapter-segment.current .chapter-track > i,
-:root[data-theme="dark"] .contents-row.current .contents-spine > i {
+.chapter-segment.current .chapter-track > i,
+.contents-row.current .contents-spine > i {
   background: var(--text);
 }
 .chapter-track > i,
 .contents-spine > i {
   display: block;
   width: 100%;
-  background: var(--seg-read);
+  background: var(--muted);
   border-radius: inherit;
 }
 @property --contents-read-y {
@@ -1289,7 +1285,7 @@ kbd {
   overflow: hidden;
   overflow-wrap: anywhere;
 }
-.list-row .understanding-status {
+.list-row .question-status {
   font-size: 10.5px;
   color: var(--faint);
   gap: 4px;
@@ -1713,8 +1709,11 @@ kbd {
   margin-top: 12px;
 }
 .composer-hint {
-  font: 9px var(--font-mono);
-  color: var(--faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 12px/16px var(--font-sans);
+  color: var(--muted);
   margin-right: auto;
   white-space: nowrap;
 }
@@ -2918,7 +2917,7 @@ a[href] * {
 .annotation-action-popover {
   position: fixed;
   z-index: 50;
-  width: 220px;
+  width: 144px;
   max-width: calc(100vw - 24px);
   background: var(--surface);
   color: var(--text);
@@ -2960,7 +2959,7 @@ a[href] * {
   gap: 8px;
 }
 .card-delete-confirm button:first-child {
-  background: var(--surface);
+  background: var(--surface-2);
 }
 .delete-action {
   color: var(--unclear);
@@ -2999,4 +2998,164 @@ a[href] * {
 /* Keep yellow readable on the warm light-mode rail without changing its fill. */
 :root:not([data-theme="dark"]) .minimap-rail .rail-marker.highlight {
   box-shadow: inset 0 0 0 0.5px color-mix(in srgb, #806017 48%, transparent);
+}
+
+/* A saved highlight can stand alone; writing is an optional follow-up. */
+.card-add-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.card-add-note kbd {
+  margin-left: 8px;
+}
+@media (hover: hover) {
+  .card-add-note:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+.signal.question,
+.rail-marker.question,
+.annotation-card.question .type-pill i {
+  border-radius: 1.5px;
+}
+/* Fade without transformed compositor surfaces that can linger in Safari. */
+.draft-card {
+  animation-name: annotation-surface-in;
+}
+@keyframes annotation-surface-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reserve a separate header slot for options, including text-free highlights. */
+.annotation-card:has(> .card-more) .card-meta {
+  padding-right: 28px;
+}
+.annotation-card > .card-more {
+  top: 9px;
+  bottom: auto;
+}
+
+.card-add-note {
+  width: calc(100% - 24px);
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  text-align: left;
+  font-size: 13px;
+}
+.card-add-note kbd {
+  margin-left: auto;
+}
+/* Measured neighbors follow the animated card height directly, without lag. */
+.anchored-card {
+  transition: none;
+}
+.draft-card,
+.draft-card .inline-composer {
+  animation: none;
+}
+.draft-card .inline-composer {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anchored-card {
+    transition: none;
+  }
+  .draft-card .inline-composer {
+    animation: none;
+  }
+}
+
+/* Returning from an editor should paint the saved card and its line together. */
+.anchored-card > .connector path {
+  animation: none;
+}
+
+.card-add-note {
+  height: 36px;
+}
+.card-add-note kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  line-height: 16px;
+}
+.annotation-card > div.card-main {
+  cursor: default;
+}
+
+.annotation-action-popover[role="alertdialog"] {
+  width: 200px;
+}
+.annotation-action-popover .card-actions {
+  padding: 4px;
+  gap: 2px;
+}
+.annotation-action-popover .card-actions button {
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.annotation-card[data-actions-open="true"] > .card-more {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.card-delete-section {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 160ms var(--ease),
+    opacity 160ms ease,
+    visibility 0s 160ms;
+}
+.card-delete-section[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.card-delete-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.card-delete-section .card-delete-confirm {
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+.card-delete-section .card-delete-confirm p {
+  margin: 0 0 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-delete-section {
+    transition: none;
+  }
+}
+
+.composer-key-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  font: 11px/16px var(--font-mono);
+}
+.composer-key-combo svg {
+  display: block;
+  flex: none;
+  stroke-width: 1.75;
 }
