@@ -439,9 +439,16 @@ kbd {
 .react-pdf__Page__canvas {
   border-radius: 6px;
 }
-.react-pdf__Page__textContent ::selection {
-  background: var(--selection);
+/* PDF glyphs are already painted on the canvas. Blend the selection layer
+   like saved passage overlays, without repainting selected glyphs. */
+.react-pdf__Page__textContent {
   mix-blend-mode: multiply;
+}
+.react-pdf__Page__textContent ::selection {
+  background: color-mix(in srgb, var(--highlight) 62%, transparent);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 .page-placeholder {
   position: absolute;
@@ -491,7 +498,7 @@ kbd {
   pointer-events: none;
 }
 .passage.highlight {
-  background: color-mix(in srgb, var(--highlight) 55%, transparent);
+  background: color-mix(in srgb, var(--highlight) 62%, transparent);
 }
 .passage.note {
   background: color-mix(in srgb, var(--note) 18%, transparent);
@@ -507,7 +514,6 @@ kbd {
 }
 .draft-passage {
   background: var(--selection);
-  opacity: 0.7;
 }
 .highlight {
   --signal: var(--highlight);
@@ -538,10 +544,6 @@ kbd {
 }
 .range-tick.thick {
   width: 5px;
-}
-.page-understanding {
-  position: absolute;
-  right: -15px;
 }
 .margin-column {
   position: absolute;
@@ -1570,7 +1572,8 @@ kbd {
   padding: 4px;
   border-radius: 12px;
   box-shadow: var(--e3);
-  animation: menu-in 150ms var(--ease);
+  animation: annotation-toolbar-in 160ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  transform-origin: center bottom;
 }
 .selection-toolbar::after {
   content: "";
@@ -1614,17 +1617,14 @@ kbd {
   color: var(--unclear);
 }
 .composer {
-  position: fixed;
-  z-index: 35;
-  right: 24px;
-  bottom: 24px;
-  width: 320px;
+  position: relative;
+  width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--e3);
-  padding: 13px;
-  animation: card-in 200ms var(--ease);
+  padding: 12px;
+  animation: annotation-editor-in 160ms cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 .composer-controls {
   display: flex;
@@ -2750,4 +2750,263 @@ a[href] * {
 .chapter-segment::before {
   right: auto;
   width: calc(var(--marker-edge, 42px) + 2px);
+}
+
+.selection-toolbar .default-highlight {
+  background: color-mix(in srgb, var(--highlight) 18%, transparent);
+}
+.draft-passage.highlight {
+  background: color-mix(in srgb, var(--highlight) 62%, transparent);
+}
+.draft-passage.note {
+  background: color-mix(in srgb, var(--note) 24%, transparent);
+}
+.draft-passage.question {
+  background: color-mix(in srgb, var(--question) 28%, transparent);
+}
+
+.selection-toolbar .selected-type {
+  background: color-mix(in srgb, var(--signal) 18%, transparent);
+}
+
+.inline-composer .composer-controls {
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.inline-composer .composer-controls .segmented {
+  width: 100%;
+}
+.inline-composer .composer-controls .segmented button {
+  font-size: 13px;
+  padding: 8px 4px;
+}
+.inline-composer .understanding-picker {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+}
+.inline-composer .understanding-picker select {
+  font-size: 13px;
+}
+.inline-composer .composer-hint {
+  font-size: 12px;
+}
+.inline-composer footer .pill,
+.inline-composer .text-button {
+  font-size: 13px;
+}
+.inline-composer textarea:focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 18%, transparent);
+}
+@keyframes annotation-toolbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes annotation-editor-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (max-width: 1099px) {
+  .margin-column.has-editor {
+    position: fixed;
+    left: auto;
+    right: 24px;
+    top: 170px;
+    width: min(320px, calc(100vw - 48px));
+  }
+  .margin-column.has-editor .draft-card {
+    top: 0 !important;
+  }
+  .margin-column.has-editor .connector {
+    display: none;
+  }
+  .inline-composer {
+    right: auto;
+    bottom: auto;
+    max-height: calc(100dvh - 194px);
+    overflow-y: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .selection-toolbar,
+  .inline-composer {
+    animation: none;
+  }
+}
+
+/* The editor and its connector enter and disappear as one draft surface. */
+.draft-card {
+  animation: annotation-editor-in 160ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+.draft-card .inline-composer,
+.draft-card .connector path {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .draft-card {
+    animation: none;
+  }
+}
+
+.inline-composer:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--signal) 70%, transparent);
+  outline-offset: 4px;
+}
+.composer-understanding {
+  width: 100%;
+}
+.understanding-toggle {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+}
+.optional-label {
+  margin-left: 8px;
+  color: var(--faint);
+}
+.understanding-toggle kbd,
+.annotation-keyboard-hint kbd {
+  font: 12px var(--font-mono);
+}
+.understanding-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.understanding-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+}
+.understanding-tabs button[aria-pressed="true"] {
+  background: var(--current-row);
+  border-color: var(--muted);
+}
+.understanding-clear {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 8px 0 0;
+}
+.annotation-keyboard-hint {
+  min-height: 40px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.annotation-keyboard-hint > span {
+  padding: 0 4px;
+  color: var(--faint);
+}
+@media (hover: hover) {
+  .understanding-tabs button:hover {
+    background: var(--current-row);
+  }
+}
+
+/* Floating card actions leave the card and neighboring annotations in place. */
+.annotation-action-popover {
+  position: fixed;
+  z-index: 50;
+  width: 220px;
+  max-width: calc(100vw - 24px);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--e3);
+  overflow: hidden;
+  animation: menu-in 120ms var(--ease);
+}
+.card-actions,
+.card-delete-confirm {
+  padding: 8px;
+  background: var(--surface);
+}
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-actions button,
+.card-delete-confirm button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.card-delete-confirm p {
+  margin: 4px 4px 12px;
+  font-size: 13px;
+}
+.card-delete-confirm > div {
+  display: flex;
+  gap: 8px;
+}
+.card-delete-confirm button:first-child {
+  background: var(--surface);
+}
+.delete-action {
+  color: var(--unclear);
+}
+.card-delete-confirm .delete-action {
+  background: color-mix(in srgb, var(--unclear) 12%, transparent);
+}
+@media (hover: hover) {
+  .card-actions button:hover,
+  .card-delete-confirm button:hover {
+    background: var(--current-row);
+  }
+}
+.card-actions button:focus-visible,
+.card-delete-confirm button:focus-visible {
+  outline: 2px solid var(--note);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-actions,
+  .card-delete-confirm {
+    animation: none;
+  }
+}
+
+.card-actions button {
+  justify-content: flex-start;
+  width: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .annotation-action-popover {
+    animation: none;
+  }
 }

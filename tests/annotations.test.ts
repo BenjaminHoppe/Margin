@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mergeRects } from "../src/lib/selection";
 import {
   readState,
+  inferAnnotationKind,
+  annotationArrowAction,
   isDraftDirty,
   storageKey,
   toMarkdown,
@@ -155,4 +157,47 @@ test("word fragments merge across spaces without joining columns or adjacent lin
   assert.ok(Math.abs(merged[0].width - 0.15) < 0.0001);
   assert.equal(merged[1].x, 0.6);
   assert.equal(merged[2].y, 0.23);
+});
+
+test("annotation type follows text until manually chosen", () => {
+  assert.equal(inferAnnotationKind(""), "highlight");
+  assert.equal(inferAnnotationKind("   "), "highlight");
+  assert.equal(inferAnnotationKind("A useful point"), "note");
+  assert.equal(inferAnnotationKind("Why does this happen?  "), "question");
+  assert.equal(inferAnnotationKind("What changed？"), "question");
+  assert.equal(inferAnnotationKind("A useful point", "highlight"), "highlight");
+  assert.equal(inferAnnotationKind("Why?", "note"), "note");
+  assert.equal(inferAnnotationKind("No punctuation", "question"), "question");
+});
+
+test("annotation arrows cycle type and optional understanding independently", () => {
+  assert.deepEqual(
+    annotationArrowAction("highlight", "unmarked", "ArrowRight"),
+    { kind: "note", understanding: "unmarked" },
+  );
+  assert.deepEqual(annotationArrowAction("question", "unclear", "ArrowRight"), {
+    kind: "highlight",
+    understanding: "unclear",
+  });
+  assert.deepEqual(
+    annotationArrowAction("highlight", "understood", "ArrowLeft"),
+    { kind: "question", understanding: "understood" },
+  );
+  assert.deepEqual(annotationArrowAction("note", "unmarked", "ArrowDown"), {
+    kind: "note",
+    understanding: "unclear",
+  });
+  assert.deepEqual(annotationArrowAction("note", "unclear", "ArrowDown"), {
+    kind: "note",
+    understanding: "partly understood",
+  });
+  assert.deepEqual(
+    annotationArrowAction("note", "partly understood", "ArrowDown"),
+    { kind: "note", understanding: "understood" },
+  );
+  assert.deepEqual(annotationArrowAction("question", "unmarked", "ArrowUp"), {
+    kind: "question",
+    understanding: "understood",
+  });
+  assert.equal(annotationArrowAction("highlight", "unmarked", "x"), null);
 });

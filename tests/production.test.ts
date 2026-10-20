@@ -334,3 +334,27 @@ test("sidebar markers separate same-page siblings while including a parent's des
     2,
   );
 });
+
+test("session-only content resets additions and drafts while retaining reader preferences", async () => {
+  const { resetSessionAnnotations, initialReaderState } =
+    await import("../src/lib/reader-model");
+  const defaults = initialReaderState();
+  const personal = {
+    ...defaults.annotations[0],
+    id: "personal",
+  };
+  const session = {
+    ...defaults,
+    annotations: [personal],
+    draft: personal,
+    active: personal.id,
+    minimap: "contents" as const,
+  };
+  const restored = resetSessionAnnotations(session);
+  assert.deepEqual(restored.annotations, defaults.annotations);
+  assert.equal(restored.draft, null);
+  assert.equal(restored.active, defaults.active);
+  assert.equal(restored.minimap, "contents");
+  assert.deepEqual(restored.position, session.position);
+  assert.equal(session.annotations[0].id, "personal");
+});

@@ -1,14 +1,23 @@
 "use client";
-import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   MoreHorizontal,
+  Pencil,
+  Trash2,
   X,
   Highlighter,
   MessageSquare,
   CircleHelp,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { mergeRects } from "@/lib/selection";
-import type { Annotation, Draft, Understanding } from "@/lib/annotations";
+import type { Annotation, Draft, Kind, Understanding } from "@/lib/annotations";
 import {
   kindLabel,
   pageLabel,
@@ -17,6 +26,7 @@ import {
   type AnnotationMode,
   type ShowOnPage,
 } from "@/lib/reader-model";
+import { Composer } from "./annotating";
 export function UnderstandingStatus({
   value,
   question = false,
@@ -61,25 +71,114 @@ export function AnnotationCard({
   active = false,
   labels,
   onOpen,
-  onStub,
+  onEdit,
+  onDelete,
   preview = false,
 }: {
   annotation: Annotation;
   active?: boolean;
   labels: string[] | null;
   onOpen?: (a: Annotation) => void;
-  onStub?: () => void;
+  onEdit?: (annotation: Annotation) => void;
+  onDelete?: (annotation: Annotation) => void;
   preview?: boolean;
 }) {
+  const [action, setAction] = useState<"menu" | "delete" | null>(null);
+  const card = useRef<HTMLElement>(null);
+  const more = useRef<HTMLButtonElement>(null);
+  const actionPanel = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!action || !more.current || !actionPanel.current) return;
+    const anchor = more.current.getBoundingClientRect();
+    const panel = actionPanel.current;
+    panel.style.left = `${Math.max(12, Math.min(innerWidth - panel.offsetWidth - 12, anchor.right - panel.offsetWidth))}px`;
+    panel.style.top = `${Math.max(12, anchor.bottom + 8 + panel.offsetHeight <= innerHeight - 12 ? anchor.bottom + 8 : anchor.top - panel.offsetHeight - 8)}px`;
+  }, [action]);
+  useEffect(() => {
+    if (!action) return;
+    actionPanel.current
+      ?.querySelector<HTMLButtonElement>(
+        ".card-actions button, .card-delete-confirm button",
+      )
+      ?.focus({ preventScroll: true });
+    const dismiss = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !card.current?.contains(event.target) &&
+        !actionPanel.current?.contains(event.target)
+      )
+        setAction(null);
+    };
+    const dismissMovedAnchor = (event: Event) => {
+      if (
+        event.type === "resize" ||
+        (event.target instanceof HTMLElement &&
+          event.target.classList.contains("paper-viewport"))
+      )
+        setAction(null);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    window.addEventListener("resize", dismissMovedAnchor);
+    window.addEventListener("scroll", dismissMovedAnchor, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      window.removeEventListener("resize", dismissMovedAnchor);
+      window.removeEventListener("scroll", dismissMovedAnchor, true);
+    };
+  }, [action]);
   const Main = preview && !onOpen ? "div" : "button";
   return (
     <article
+      ref={card}
+      onKeyDown={(event) => {
+        if (action && event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          setAction(null);
+          more.current?.focus({ preventScroll: true });
+        }
+        if (action === "delete" && event.key.startsWith("Arrow"))
+          event.stopPropagation();
+        if (
+          action === "menu" &&
+          ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          const buttons = Array.from(
+            actionPanel.current?.querySelectorAll<HTMLButtonElement>(
+              ".card-actions button",
+            ) ?? [],
+          );
+          const index = buttons.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          const next =
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? buttons.length - 1
+                : (index +
+                    (event.key === "ArrowDown" ? 1 : -1) +
+                    buttons.length) %
+                  buttons.length;
+          buttons[next]?.focus();
+        }
+      }}
       className={`annotation-card ${annotation.kind} ${active ? "active" : ""}`}
+      data-actions-open={action !== null}
       data-card-id={preview ? undefined : annotation.id}
     >
       <Main
         className="card-main"
-        onClick={onOpen ? () => onOpen(annotation) : undefined}
+        onClick={
+          onOpen
+            ? () => {
+                setAction(null);
+                onOpen(annotation);
+              }
+            : undefined
+        }
         aria-label={`Open ${annotation.kind} on page ${pageLabel(annotation.page, labels)}: ${annotation.body || annotation.quote}`}
         aria-pressed={onOpen ? active : undefined}
       >
@@ -99,15 +198,87 @@ export function AnnotationCard({
           resolved={annotation.resolved}
         />
       </Main>
-      {!preview && (
-        <button
-          className="card-more"
-          aria-label="More annotation options · coming soon"
-          title="Coming soon"
-          onClick={onStub}
-        >
-          <MoreHorizontal size={16} />
-        </button>
+      {!preview && onEdit && onDelete && (
+        <>
+          <button
+            ref={more}
+            className="card-more"
+            aria-label="Annotation options"
+            aria-expanded={action !== null}
+            aria-haspopup="menu"
+            onClick={() => setAction((old) => (old ? null : "menu"))}
+          >
+            <MoreHorizontal size={16} />
+          </button>
+          {action &&
+            createPortal(
+              <div
+                ref={actionPanel}
+                className="annotation-action-popover"
+                role={action === "menu" ? "menu" : "alertdialog"}
+                aria-label={
+                  action === "menu"
+                    ? "Annotation actions"
+                    : `Delete ${kindLabel[annotation.kind]}?`
+                }
+                onBlur={(event) => {
+                  if (
+                    event.relatedTarget &&
+                    !event.currentTarget.contains(event.relatedTarget) &&
+                    event.relatedTarget !== more.current
+                  )
+                    setAction(null);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {action === "menu" && (
+                  <div className="card-actions">
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setAction(null);
+                        onEdit(annotation);
+                      }}
+                    >
+                      <Pencil size={14} />
+                      Edit
+                    </button>
+                    <button
+                      role="menuitem"
+                      className="delete-action"
+                      onClick={() => setAction("delete")}
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
+                )}
+                {action === "delete" && (
+                  <div className="card-delete-confirm">
+                    <p>Delete this {kindLabel[annotation.kind]}?</p>
+                    <div>
+                      <button
+                        onClick={() => {
+                          setAction(null);
+                          more.current?.focus({ preventScroll: true });
+                        }}
+                      >
+                        Keep it
+                      </button>
+                      <button
+                        className="delete-action"
+                        onClick={() => onDelete(annotation)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>,
+              document.body,
+            )}
+        </>
       )}
     </article>
   );
@@ -124,11 +295,16 @@ export function AnnotationPageLayer({
   show,
   labels,
   draft,
+  onDraftChange,
+  onDraftTypeChange,
+  onDraftCancel,
+  onDraftSave,
   onOpen,
   onClosePeek,
   onShowMargin,
   onOverflow,
-  onStub,
+  onEdit,
+  onDelete,
 }: {
   annotations: Annotation[];
   page: number;
@@ -141,17 +317,28 @@ export function AnnotationPageLayer({
   show: ShowOnPage;
   labels: string[] | null;
   draft: Draft | null;
+  onDraftChange: (draft: Draft) => void;
+  onDraftTypeChange: (kind: Kind) => void;
+  onDraftCancel: () => void;
+  onDraftSave: () => void;
   onOpen: (a: Annotation) => void;
   onClosePeek: () => void;
   onShowMargin: () => void;
   onOverflow: (page: number) => void;
-  onStub: () => void;
+  onEdit: (annotation: Annotation) => void;
+  onDelete: (annotation: Annotation) => void;
 }) {
   const column = useRef<HTMLDivElement>(null);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const located = sortedAnnotations(
     annotations
-      .filter((a) => a.page === page && a.rects.length && show[a.kind])
+      .filter(
+        (a) =>
+          a.page === page &&
+          a.rects.length &&
+          show[a.kind] &&
+          a.id !== draft?.id,
+      )
       .map((a) => ({ ...a, rects: mergeRects(a.rects) })),
   );
   const allCards =
@@ -160,7 +347,14 @@ export function AnnotationPageLayer({
       : mode === "margin"
         ? located
         : [];
-  const cards = allCards.length > 4 ? allCards.slice(0, 3) : allCards;
+  const pageDraft = draft?.page === page ? draft : null;
+  const displayedCards = allCards.length > 4 ? allCards.slice(0, 3) : allCards;
+  const cards = sortedAnnotations([
+    ...displayedCards.filter((annotation) => annotation.id !== pageDraft?.id),
+    ...(pageDraft
+      ? [{ ...pageDraft, id: "draft", createdAt: "", updatedAt: "" }]
+      : []),
+  ]);
   const ids = cards.map((a) => a.id).join("|");
   useLayoutEffect(() => {
     if (!column.current || !near) return;
@@ -197,16 +391,13 @@ export function AnnotationPageLayer({
     const passageTop = Math.min(...a.rects.map((r) => r.y)) * height;
     const passageBottom =
       Math.max(...a.rects.map((r) => r.y + r.height)) * height;
+    const source = (passageTop + passageBottom) / 2;
     const previous = placements.at(-1);
-    const top = Math.max(
-      0,
-      passageTop - 8,
-      previous ? previous.bottom + 10 : 0,
-    );
+    const top = Math.max(0, source - 22, previous ? previous.bottom + 10 : 0);
     placements.push({
       annotation: a,
       top,
-      source: (passageTop + passageBottom) / 2,
+      source,
       bottom: top + (heights[a.id] ?? 120),
     });
   }
@@ -245,19 +436,13 @@ export function AnnotationPageLayer({
                 aria-label={`${kindLabel[a.kind]} on page ${pageLabel(page, labels)}: ${a.body || a.quote}`}
                 aria-pressed={active === a.id}
               />
-              {show.understanding && a.understanding !== "unmarked" && (
-                <i
-                  className={`page-understanding understanding-dot ${a.understanding.replaceAll(" ", "-")}`}
-                  style={{ top: `${top * 100}%` }}
-                />
-              )}
             </div>
           );
         })}
         {draft?.page === page &&
           draft.rects.map((r, i) => (
             <span
-              className="draft-passage"
+              className={`draft-passage ${draft.kind}`}
               key={i}
               style={{
                 left: `${r.x * 100}%`,
@@ -268,42 +453,66 @@ export function AnnotationPageLayer({
             />
           ))}
       </div>
-      <div className="margin-column" ref={column}>
-        {placements.map(({ annotation, top, source }) => (
-          <div
-            key={annotation.id}
-            className="anchored-card"
-            style={{ top } as CSSProperties}
-          >
-            <svg
-              className={`connector ${annotation.kind}`}
-              width="40"
-              height={Math.max(height, bottom)}
-              style={{ top: -top }}
-              aria-hidden="true"
+      <div
+        className={`margin-column ${pageDraft ? "has-editor" : ""}`}
+        ref={column}
+      >
+        {placements.map(({ annotation, top, source }) => {
+          const target = top + 22;
+          const connectorTop = Math.min(source, target) - 2;
+          const from = source - connectorTop;
+          const to = target - connectorTop;
+          return (
+            <div
+              key={annotation.id}
+              className={`anchored-card ${annotation.id === "draft" ? "draft-card" : ""}`}
+              style={{ top } as CSSProperties}
             >
-              <path
-                d={`M 2 ${source} C 22.9 ${source} 19.1 ${top + 22} 40 ${top + 22}`}
-                pathLength="1"
-              />
-            </svg>
-            <AnnotationCard
-              annotation={annotation}
-              active={active === annotation.id}
-              labels={labels}
-              onOpen={onOpen}
-              onStub={onStub}
-            />
-            {(focus || mode === "hidden") && (
-              <div className="peek-actions">
-                <button onClick={onShowMargin}>Show all in margin</button>
-                <button aria-label="Close annotation" onClick={onClosePeek}>
-                  <X size={12} />
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+              <svg
+                className={`connector ${annotation.kind}`}
+                width="40"
+                height={Math.abs(target - source) + 4}
+                style={{ top: connectorTop - top }}
+                aria-hidden="true"
+              >
+                <path
+                  d={
+                    Math.abs(source - target) < 0.5
+                      ? `M 2 ${from} L 40 ${from}`
+                      : `M 2 ${from} C 22.9 ${from} 19.1 ${to} 40 ${to}`
+                  }
+                  pathLength="1"
+                />
+              </svg>
+              {annotation.id === "draft" && pageDraft ? (
+                <Composer
+                  draft={pageDraft}
+                  onChange={onDraftChange}
+                  onTypeChange={onDraftTypeChange}
+                  onCancel={onDraftCancel}
+                  onSave={onDraftSave}
+                />
+              ) : (
+                <AnnotationCard
+                  annotation={annotation}
+                  active={active === annotation.id}
+                  labels={labels}
+                  onOpen={onOpen}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              )}
+              {annotation.id !== "draft" && (focus || mode === "hidden") && (
+                <div className="peek-actions">
+                  <button onClick={onShowMargin}>Show all in margin</button>
+                  <button aria-label="Close annotation" onClick={onClosePeek}>
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {allCards.length > 4 && (
           <button
             className="overflow-chip pill subtle"

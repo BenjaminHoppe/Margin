@@ -14,6 +14,9 @@ import { ChevronLeft, Download, Focus, SlidersHorizontal } from "lucide-react";
 import PdfView from "../pdf-view";
 import {
   UNDERSTANDINGS,
+  inferAnnotationKind,
+  isDraftDirty,
+  annotationArrowAction,
   type Annotation,
   type Draft,
   type Kind,
@@ -26,6 +29,7 @@ import {
   normalizeOutline,
   paper as neptunePaper,
   readReaderState,
+  resetSessionAnnotations,
   readerKey,
   sortedAnnotations,
   type AnnotationMode,
@@ -33,14 +37,17 @@ import {
 } from "@/lib/reader-model";
 import { AnnotationPageLayer, EmptyAnnotations } from "./annotation-layers";
 import { AnnotationList } from "./annotation-list";
-import { Composer, SelectionToolbar, type TextSelection } from "./annotating";
+import { SelectionToolbar, type TextSelection } from "./annotating";
 import { Navigation } from "./navigation";
 import { copyExport, ExportMenu, ViewMenu } from "./menus";
 import { Presence, Segmented, Shortcuts, Toast } from "./ui";
 export default function Reader({ study: paper }: { study: Study }) {
   const neptune = paper.id === neptunePaper.id;
   const storageKey = readerKey(paper);
-  const [initial] = useState(() => readReaderState(localStorage, paper));
+  const [initial] = useState(() => {
+    const loaded = readReaderState(localStorage, paper);
+    return { ...loaded, state: resetSessionAnnotations(loaded.state, paper) };
+  });
   const [saved, setSaved] = useState(initial.state);
   const [storageError, setStorageError] = useState(initial.error);
   const [sections, setSections] = useState<OutlineSection[]>(
@@ -56,6 +63,8 @@ export default function Reader({ study: paper }: { study: Study }) {
   const [menu, setMenu] = useState<"view" | "export" | null>(null);
   const [shortcuts, setShortcuts] = useState(false);
   const [selection, setSelection] = useState<TextSelection | null>(null);
+  const manualDraftType = useRef<Kind | null>(null);
+  const editorFocusFrame = useRef<number | null>(null);
   const [toast, setToast] = useState("");
   const [pageFilter, setPageFilter] = useState<number | null>(null);
   const [screenWidth, setScreenWidth] = useState(() => innerWidth);
@@ -103,13 +112,18 @@ export default function Reader({ study: paper }: { study: Study }) {
       if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
       if (scrollFrame.current !== null)
         cancelAnimationFrame(scrollFrame.current);
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
     };
   }, []);
   useEffect(() => {
     if (initial.error) return;
     const write = () => {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(savedRef.current));
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify(resetSessionAnnotations(savedRef.current, paper)),
+        );
       } catch {
         setStorageError(
           "Browser storage is unavailable. Keep this tab open and export your annotations.",
@@ -121,12 +135,15 @@ export default function Reader({ study: paper }: { study: Study }) {
       write();
       window.removeEventListener("pagehide", write);
     };
-  }, [initial.error, storageKey]);
+  }, [initial.error, storageKey, paper]);
   useEffect(() => {
     if (initial.error) return;
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(saved));
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify(resetSessionAnnotations(saved, paper)),
+        );
       } catch {
         setStorageError(
           "Browser storage is unavailable. Keep this tab open and export your annotations.",
@@ -134,7 +151,7 @@ export default function Reader({ study: paper }: { study: Study }) {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [saved, initial.error, storageKey]);
+  }, [saved, initial.error, storageKey, paper]);
   const finishJump = useCallback(() => {
     const target = pendingJump.current;
     const root = viewport.current;
@@ -323,53 +340,124 @@ export default function Reader({ study: paper }: { study: Study }) {
     setSelection(null);
     window.getSelection()?.removeAllRanges();
   }
-  function begin(kind: Kind, understanding: Understanding = "unmarked") {
-    if (!selection) return;
-    const { page, quote, rects } = selection;
-    if (kind === "highlight") {
-      const now = new Date().toISOString();
-      const annotation: Annotation = {
-        id: crypto.randomUUID(),
-        page,
-        quote,
-        rects,
-        kind,
-        understanding,
-        body: "",
-        resolved: false,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setSaved((old) => ({
-        ...old,
-        annotations: [...old.annotations, annotation],
-        active: annotation.id,
-      }));
-      if (focus || mode === "hidden") setPeek(annotation.id);
-      clearSelection();
-      announce("Highlight saved");
-    } else {
+  const startAnnotation = useCallback(
+    (selected: TextSelection | null) => {
+      if (!selected) return;
+      if (isDraftDirty(savedRef.current.draft, savedRef.current.annotations)) {
+        announce(
+          "Save or cancel your current annotation before selecting another passage.",
+        );
+        return;
+      }
+      manualDraftType.current = null;
+      setSelection(selected);
+      const { page, quote, rects } = selected;
       setSaved((old) => ({
         ...old,
         draft: {
           page,
           quote,
           rects,
-          kind,
-          understanding,
+          kind: "highlight",
+          understanding: "unmarked",
           body: "",
           resolved: false,
         },
       }));
-      clearSelection();
-    }
-  }
-  function cancelDraft() {
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
+      editorFocusFrame.current = requestAnimationFrame(() => {
+        editorFocusFrame.current = null;
+        window.getSelection()?.removeAllRanges();
+        document
+          .querySelector<HTMLFormElement>(".inline-composer")
+          ?.focus({ preventScroll: true });
+      });
+    },
+    [announce],
+  );
+  const begin = useCallback((kind: Kind, understanding?: Understanding) => {
+    // Re-clicking the default option is not an intentional type override.
+    if (savedRef.current.draft?.kind !== kind) manualDraftType.current = kind;
+    setSaved((old) => ({
+      ...old,
+      draft: old.draft
+        ? { ...old.draft, kind, ...(understanding ? { understanding } : {}) }
+        : null,
+    }));
+    if (kind !== "highlight")
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLTextAreaElement>(".inline-composer textarea")
+          ?.focus({ preventScroll: true }),
+      );
+  }, []);
+  const changeDraft = useCallback((draft: Draft) => {
+    setSaved((old) => ({
+      ...old,
+      draft: {
+        ...draft,
+        kind: inferAnnotationKind(draft.body, manualDraftType.current),
+      },
+    }));
+  }, []);
+  const cancelDraft = useCallback(() => {
+    if (editorFocusFrame.current !== null)
+      cancelAnimationFrame(editorFocusFrame.current);
+    editorFocusFrame.current = null;
+    manualDraftType.current = null;
     setSaved((old) => ({ ...old, draft: null }));
     clearSelection();
     viewport.current?.focus({ preventScroll: true });
-  }
-  function saveDraft() {
+  }, []);
+  const editAnnotation = useCallback(
+    (annotation: Annotation) => {
+      if (isDraftDirty(savedRef.current.draft, savedRef.current.annotations)) {
+        announce(
+          "Save or cancel your current annotation before editing another.",
+        );
+        return;
+      }
+      manualDraftType.current = annotation.kind;
+      clearSelection();
+      setPeek(null);
+      setSaved((old) => ({
+        ...old,
+        active: annotation.id,
+        draft: { ...annotation },
+      }));
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
+      editorFocusFrame.current = requestAnimationFrame(() => {
+        editorFocusFrame.current = null;
+        document
+          .querySelector<HTMLElement>(
+            annotation.body ? ".inline-composer textarea" : ".inline-composer",
+          )
+          ?.focus({ preventScroll: true });
+      });
+    },
+    [announce],
+  );
+  const deleteAnnotation = useCallback(
+    (annotation: Annotation) => {
+      setSaved((old) => ({
+        ...old,
+        annotations: old.annotations.filter(
+          (item) => item.id !== annotation.id,
+        ),
+        active: old.active === annotation.id ? null : old.active,
+        draft: old.draft?.id === annotation.id ? null : old.draft,
+      }));
+      setPeek((old) => (old === annotation.id ? null : old));
+      announce(
+        `${annotation.kind[0].toUpperCase() + annotation.kind.slice(1)} deleted`,
+      );
+      viewport.current?.focus({ preventScroll: true });
+    },
+    [announce],
+  );
+  const saveDraft = useCallback(() => {
     const draft = saved.draft;
     if (!draft) return;
     if (draft.kind !== "highlight" && !draft.body.trim()) {
@@ -385,7 +473,10 @@ export default function Reader({ study: paper }: { study: Study }) {
       ...draft,
       body: draft.body.trim(),
       id: draft.id ?? crypto.randomUUID(),
-      createdAt: now,
+      createdAt:
+        savedRef.current.annotations.find(
+          (original) => original.id === draft.id,
+        )?.createdAt ?? now,
       updatedAt: now,
     };
     setSaved((old) => ({
@@ -398,8 +489,9 @@ export default function Reader({ study: paper }: { study: Study }) {
     announce(
       `${a.kind === "question" ? "Question" : a.kind === "note" ? "Note" : "Highlight"} saved`,
     );
+    clearSelection();
     viewport.current?.focus({ preventScroll: true });
-  }
+  }, [saved.draft, focus, mode, announce]);
   function toggleFocus() {
     setMenu(null);
     setSelection(null);
@@ -411,7 +503,8 @@ export default function Reader({ study: paper }: { study: Study }) {
   }, [focus]);
   useEffect(() => {
     const selected = () => {
-      if (window.getSelection()?.isCollapsed) setSelection(null);
+      if (window.getSelection()?.isCollapsed && !savedRef.current.draft)
+        setSelection(null);
     };
     document.addEventListener("selectionchange", selected);
     return () => document.removeEventListener("selectionchange", selected);
@@ -424,7 +517,12 @@ export default function Reader({ study: paper }: { study: Study }) {
   }, [jump]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || document.querySelector("dialog[open]")) return;
+      if (
+        e.defaultPrevented ||
+        e.isComposing ||
+        document.querySelector("dialog[open]")
+      )
+        return;
       const typing = (e.target as HTMLElement).closest(
         'input,textarea,select,[contenteditable="true"]',
       );
@@ -442,6 +540,34 @@ export default function Reader({ study: paper }: { study: Study }) {
       if (typing) return;
       const key = e.key.toLowerCase();
       const cmd = e.metaKey || e.ctrlKey;
+      if (saved.draft && !cmd && !e.altKey) {
+        const action = annotationArrowAction(
+          saved.draft.kind,
+          saved.draft.understanding,
+          e.key,
+        );
+        if (action) {
+          e.preventDefault();
+          if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            // Keep focus on the controls while cycling; typing enters the field.
+            manualDraftType.current = action.kind;
+            setSaved((old) => ({
+              ...old,
+              draft: old.draft ? { ...old.draft, kind: action.kind } : null,
+            }));
+          } else
+            changeDraft({
+              ...saved.draft,
+              understanding: action.understanding,
+            });
+          return;
+        }
+      }
+      if (cmd && e.key === "Enter" && saved.draft) {
+        e.preventDefault();
+        saveDraft();
+        return;
+      }
       if (cmd) {
         if (key === "e") {
           e.preventDefault();
@@ -531,10 +657,6 @@ export default function Reader({ study: paper }: { study: Study }) {
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   });
-  const stub = useCallback(
-    () => announce("Coming soon in this demo"),
-    [announce],
-  );
   // Reading-position updates should move the rail, not reconcile 116 PDF pages.
   const documentView = useMemo(
     () => (
@@ -545,7 +667,7 @@ export default function Reader({ study: paper }: { study: Study }) {
         active={saved.active}
         scrollRoot={viewport}
         onOpen={openAnnotation}
-        onSelection={setSelection}
+        onSelection={startAnnotation}
         onLoad={onLoad}
         onReady={onReady}
         onMetadata={onMetadata}
@@ -563,6 +685,10 @@ export default function Reader({ study: paper }: { study: Study }) {
             show={saved.showOnPage}
             labels={labels}
             draft={saved.draft}
+            onDraftChange={changeDraft}
+            onDraftTypeChange={begin}
+            onDraftCancel={cancelDraft}
+            onDraftSave={saveDraft}
             onOpen={openAnnotation}
             onClosePeek={() => setPeek(null)}
             onShowMargin={() => {
@@ -577,7 +703,8 @@ export default function Reader({ study: paper }: { study: Study }) {
               setSaved((old) => ({ ...old, mode: "list" }));
               setPageFilter(page);
             }}
-            onStub={stub}
+            onEdit={editAnnotation}
+            onDelete={deleteAnnotation}
           />
         )}
       />
@@ -590,6 +717,11 @@ export default function Reader({ study: paper }: { study: Study }) {
       saved.showOnPage,
       saved.draft,
       openAnnotation,
+      startAnnotation,
+      changeDraft,
+      begin,
+      cancelDraft,
+      saveDraft,
       onLoad,
       onReady,
       onMetadata,
@@ -599,7 +731,8 @@ export default function Reader({ study: paper }: { study: Study }) {
       peek,
       labels,
       screenWidth,
-      stub,
+      editAnnotation,
+      deleteAnnotation,
     ],
   );
   return (
@@ -753,14 +886,11 @@ export default function Reader({ study: paper }: { study: Study }) {
           <EmptyAnnotations />
         </aside>
       )}
-      {selection && !saved.draft && (
-        <SelectionToolbar selection={selection} onCreate={begin} />
-      )}
-      {saved.draft && (
-        <Composer
-          draft={saved.draft}
-          onChange={(draft: Draft) => setSaved((old) => ({ ...old, draft }))}
-          onCancel={cancelDraft}
+      {selection && saved.draft && (
+        <SelectionToolbar
+          selection={selection}
+          kind={saved.draft.kind}
+          onCreate={begin}
           onSave={saveDraft}
         />
       )}

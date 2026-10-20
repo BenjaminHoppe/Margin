@@ -1,5 +1,11 @@
 import type { Study } from "./study";
 export type Kind = "highlight" | "note" | "question";
+// Manual type choices win; otherwise infer only from the user's own text.
+export function inferAnnotationKind(body: string, manual?: Kind | null): Kind {
+  if (manual) return manual;
+  const text = body.trim();
+  return !text ? "highlight" : /[?？]$/.test(text) ? "question" : "note";
+}
 export type Understanding =
   "unmarked" | "unclear" | "partly understood" | "understood";
 export const UNDERSTANDINGS: Understanding[] = [
@@ -8,6 +14,36 @@ export const UNDERSTANDINGS: Understanding[] = [
   "partly understood",
   "understood",
 ];
+export function annotationArrowAction(
+  kind: Kind,
+  understanding: Understanding,
+  key: string,
+): { kind: Kind; understanding: Understanding } | null {
+  if (key === "ArrowLeft" || key === "ArrowRight") {
+    const kinds: Kind[] = ["highlight", "note", "question"];
+    const direction = key === "ArrowRight" ? 1 : -1;
+    return {
+      kind: kinds[
+        (kinds.indexOf(kind) + direction + kinds.length) % kinds.length
+      ],
+      understanding,
+    };
+  }
+  if (key === "ArrowUp" || key === "ArrowDown") {
+    const direction = key === "ArrowDown" ? 1 : -1;
+    return {
+      kind,
+      understanding:
+        UNDERSTANDINGS[
+          (UNDERSTANDINGS.indexOf(understanding) +
+            direction +
+            UNDERSTANDINGS.length) %
+            UNDERSTANDINGS.length
+        ],
+    };
+  }
+  return null;
+}
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Anchor = { page: number; quote: string; rects: Rect[] };
 export type Annotation = Anchor & {

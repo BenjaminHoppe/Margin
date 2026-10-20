@@ -186,6 +186,19 @@ export function initialReaderState(study: Study = paper): ReaderState {
     active: neptune ? "seed-5" : null,
   };
 }
+// Authored content is session-only; retain reader preferences and position.
+export function resetSessionAnnotations(
+  state: ReaderState,
+  study: Study = paper,
+): ReaderState {
+  const defaults = initialReaderState(study);
+  return {
+    ...state,
+    annotations: defaults.annotations,
+    draft: null,
+    active: defaults.active,
+  };
+}
 export function validAnnotation(value: unknown): value is Annotation {
   if (!value || typeof value !== "object") return false;
   const a = value as Annotation;
