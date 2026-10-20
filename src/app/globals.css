@@ -871,20 +871,6 @@ kbd {
   transform: translateY(-50%);
   pointer-events: none;
 }
-.rail-marker.highlight {
-  left: 32px;
-  width: 4px;
-  height: 11px;
-  border-radius: 2px;
-}
-.rail-understanding {
-  position: absolute;
-  left: 56px;
-  width: 6px;
-  height: 6px;
-  border-radius: 2px;
-  transform: translateY(-50%);
-}
 .navigation-footer {
   position: fixed;
   left: 38px;
@@ -909,9 +895,9 @@ kbd {
   border: 1px solid var(--flyout-border);
   pointer-events: auto;
   position: fixed;
-  left: 94px;
+  left: calc(32px + var(--rail-edge, 62px));
   width: 320px;
-  max-width: calc(100vw - 102px);
+  max-width: calc(100vw - 44px - var(--rail-edge, 62px));
   max-height: calc(100dvh - var(--flyout-top, 80px) - 24px);
   display: flex;
   flex-direction: column;
@@ -2750,4 +2736,18 @@ a[href] * {
 /* Temporarily hidden for the user's minimap comparison. */
 .document-navigation .rail-position {
   display: none;
+}
+
+/* Match the simple solid row signals; populated lanes pack from the left. */
+.rail-marker.highlight {
+  left: 40px;
+  width: 4px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* Keep six pixels between the rail and markers, and after the last marker. */
+.chapter-segment::before {
+  right: auto;
+  width: calc(var(--marker-edge, 42px) + 2px);
 }

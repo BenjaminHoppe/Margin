@@ -307,6 +307,112 @@ export function Navigation({
     if (rail.current) observer.observe(rail.current);
     return () => observer.disconnect();
   }, [page, fraction, chapters, mode, focus]);
+  // Condense neighboring annotations of the same type before packing the
+  // remaining markers into lanes. The chapter preview retains every card.
+  useLayoutEffect(() => {
+    const root = rail.current;
+    if (!root || mode !== "map" || focus) return;
+    const pack = () => {
+      const edges: { element: HTMLElement; right: number }[] = [];
+      const placements: {
+        element: HTMLElement;
+        visible: boolean;
+        left: number;
+        offset: number;
+        count: number;
+      }[] = [];
+      root
+        .querySelectorAll<HTMLElement>(".chapter-markers")
+        .forEach((group) => {
+          const clusters: {
+            element: HTMLElement;
+            center: number;
+            height: number;
+            origin: number;
+            count: number;
+          }[] = [];
+          for (const kind of ["highlight", "note", "question"] as const) {
+            const markers = Array.from(
+              group.querySelectorAll<HTMLElement>(`.rail-marker.${kind}`),
+            )
+              .map((element) => ({
+                element,
+                center: element.offsetTop,
+                height: element.offsetHeight,
+              }))
+              .sort((a, b) => a.center - b.center);
+            let index = 0;
+            while (index < markers.length) {
+              const first = markers[index];
+              let count = 1;
+              index++;
+              while (
+                index < markers.length &&
+                markers[index].center - first.center <
+                  (first.height + markers[index].height) / 2
+              ) {
+                const overlapping = markers[index++];
+                placements.push({
+                  element: overlapping.element,
+                  visible: false,
+                  left: 40,
+                  offset: 0,
+                  count: 1,
+                });
+                count++;
+              }
+              clusters.push({
+                element: first.element,
+                center: first.center,
+                height: first.height,
+                origin: first.center,
+                count,
+              });
+            }
+          }
+          clusters.sort((a, b) => a.center - b.center);
+          let right = 42;
+          const laneBottoms = [-Infinity, -Infinity, -Infinity];
+          for (const cluster of clusters) {
+            const top = cluster.center - cluster.height / 2;
+            let lane = laneBottoms.findIndex((bottom) => bottom + 4 <= top);
+            if (lane < 0) lane = laneBottoms.indexOf(Math.min(...laneBottoms));
+            laneBottoms[lane] = cluster.center + cluster.height / 2;
+            const left = [42, 52, 60][lane];
+            right = Math.max(
+              right,
+              left +
+                (cluster.element.classList.contains("highlight") ? 4 : 6) +
+                6,
+            );
+            placements.push({
+              element: cluster.element,
+              visible: true,
+              left,
+              offset: cluster.center - cluster.origin,
+              count: cluster.count,
+            });
+          }
+          if (group.parentElement)
+            edges.push({ element: group.parentElement, right });
+        });
+      const widestEdge = Math.max(42, ...edges.map(({ right }) => right));
+      root.style.setProperty("--marker-edge", `${widestEdge}px`);
+      root.parentElement?.style.setProperty("--rail-edge", `${widestEdge}px`);
+      for (const { element, visible, left, offset, count } of placements) {
+        element.style.visibility = visible ? "visible" : "hidden";
+        element.style.left = `${left}px`;
+        element.style.translate = `0 ${offset}px`;
+        element.dataset.count = String(count);
+      }
+    };
+    pack();
+    const observer = new ResizeObserver(pack);
+    root
+      .querySelectorAll<HTMLElement>(".chapter-markers")
+      .forEach((group) => observer.observe(group));
+    return () => observer.disconnect();
+  }, [annotations, show, chapters, mode, focus]);
   // Every visible segment clips the same animated fill front. There is no
   // per-section easing, so the motion carries through gaps and reverses cleanly.
   useLayoutEffect(() => {
@@ -498,6 +604,12 @@ export function Navigation({
           data-grabbed={grabbed}
         >
           {chapters.map((chapter, index) => {
+            const chapterAnnotations = annotations.filter(
+              (a) =>
+                a.page >= chapter.start &&
+                a.page <= chapter.end &&
+                show[a.kind],
+            );
             const count = chapter.end - chapter.start + 1;
             const position = Math.max(
               0,
@@ -593,40 +705,15 @@ export function Navigation({
                   />
                 </span>
                 <span className="chapter-markers" aria-hidden="true">
-                  {annotations
-                    .filter(
-                      (a) =>
-                        a.page >= chapter.start &&
-                        a.page <= chapter.end &&
-                        show[a.kind],
-                    )
-                    .map((a) => (
-                      <span
-                        key={a.id}
-                        className={`rail-marker ${a.kind}`}
-                        style={{
-                          top: `clamp(7px, ${((a.page - chapter.start + (a.rects[0]?.y ?? 0.5)) / count) * 100}%, calc(100% - 7px))`,
-                        }}
-                      />
-                    ))}
-                  {show.understanding &&
-                    annotations
-                      .filter(
-                        (a) =>
-                          a.page >= chapter.start &&
-                          a.page <= chapter.end &&
-                          a.understanding !== "unmarked" &&
-                          show[a.kind],
-                      )
-                      .map((a) => (
-                        <span
-                          key={`u-${a.id}`}
-                          className={`rail-understanding understanding-dot ${a.understanding.replaceAll(" ", "-")}`}
-                          style={{
-                            top: `clamp(7px, ${((a.page - chapter.start + (a.rects[0]?.y ?? 0.5)) / count) * 100}%, calc(100% - 7px))`,
-                          }}
-                        />
-                      ))}
+                  {chapterAnnotations.map((a) => (
+                    <span
+                      key={a.id}
+                      className={`rail-marker ${a.kind}`}
+                      style={{
+                        top: `clamp(7px, ${((a.page - chapter.start + (a.rects[0]?.y ?? 0.5)) / count) * 100}%, calc(100% - 7px))`,
+                      }}
+                    />
+                  ))}
                 </span>
               </button>
             );
