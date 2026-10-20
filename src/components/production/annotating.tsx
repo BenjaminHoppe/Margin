@@ -1,11 +1,64 @@
 "use client";
 import { useLayoutEffect, useRef } from "react";
-import { Command, CornerDownLeft } from "lucide-react";
+import {
+  Command,
+  CornerDownLeft,
+  Highlighter,
+  MessageSquare,
+  CircleHelp,
+} from "lucide-react";
 import { type Draft, type Kind } from "@/lib/annotations";
 import { kindLabel } from "@/lib/reader-model";
 import type { captureSelection } from "@/lib/selection";
 import { Segmented } from "./ui";
 export type TextSelection = NonNullable<ReturnType<typeof captureSelection>>;
+export function SelectionToolbar({
+  selection,
+  onChoose,
+}: {
+  selection: TextSelection;
+  onChoose: (kind: Kind) => void;
+}) {
+  const toolbar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const page = document.querySelector<HTMLElement>(
+      `[data-page="${selection.page}"]`,
+    );
+    if (!page || !toolbar.current) return;
+    const box = page.getBoundingClientRect();
+    const first = selection.rects[0];
+    const width = toolbar.current.offsetWidth;
+    toolbar.current.style.left = `${Math.max(12, Math.min(innerWidth - width - 12, box.left + (first.x + first.width / 2) * box.width - width / 2))}px`;
+    toolbar.current.style.top = `${Math.max(80, Math.min(innerHeight - 60, box.top + first.y * box.height - 52))}px`;
+  }, [selection]);
+  return (
+    <div
+      ref={toolbar}
+      className="selection-toolbar"
+      role="group"
+      aria-label="Annotation type"
+      style={{ left: selection.left, top: selection.top }}
+    >
+      {(
+        [
+          { kind: "highlight", label: "Highlight", Icon: Highlighter },
+          { kind: "note", label: "Note", Icon: MessageSquare },
+          { kind: "question", label: "Question", Icon: CircleHelp },
+        ] as const
+      ).map(({ kind, label, Icon }) => (
+        <button
+          key={kind}
+          aria-pressed={kind === "highlight"}
+          className={kind === "highlight" ? "selected-type highlight" : kind}
+          onClick={() => onChoose(kind)}
+        >
+          <Icon size={14} className={`icon-signal ${kind}`} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 export function Composer({
   draft,
   onChange,

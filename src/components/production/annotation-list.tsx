@@ -1,19 +1,26 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Annotation, Kind } from "@/lib/annotations";
+import type { Annotation, Draft, Kind } from "@/lib/annotations";
 import {
-  kindLabel,
   pageLabel,
   sectionForAnnotation,
   sortedAnnotations,
   type OutlineSection,
 } from "@/lib/reader-model";
-import { EmptyAnnotations } from "./annotation-layers";
+import { Composer } from "./annotating";
+import { AnnotationCard, EmptyAnnotations } from "./annotation-layers";
 export function AnnotationList({
   annotations,
   sections,
   labels,
-  visiblePages,
+  visibleAnnotationIds,
+  draft,
+  onDraftChange,
+  onDraftTypeChange,
+  onDraftCancel,
+  onDraftSave,
+  onEdit,
+  onDelete,
   page,
   active,
   pageFilter,
@@ -23,7 +30,14 @@ export function AnnotationList({
   annotations: Annotation[];
   sections: OutlineSection[];
   labels: string[] | null;
-  visiblePages: number[];
+  visibleAnnotationIds: string[];
+  draft: Draft | null;
+  onDraftChange: (draft: Draft) => void;
+  onDraftTypeChange: (kind: Kind) => void;
+  onDraftCancel: () => void;
+  onDraftSave: () => void;
+  onEdit: (annotation: Annotation) => void;
+  onDelete: (annotation: Annotation) => void;
   page: number;
   active: string | null;
   pageFilter: number | null;
@@ -41,11 +55,11 @@ export function AnnotationList({
       sortedAnnotations(
         annotations.filter(
           (a) =>
-            (filter === "all" || a.kind === filter) &&
+            (filter === "all" || a.kind === filter || a.id === draft?.id) &&
             (pageFilter === null || a.page === pageFilter),
         ),
       ),
-    [annotations, filter, pageFilter],
+    [annotations, filter, pageFilter, draft?.id],
   );
   const groups = useMemo(() => {
     const result: { title: string; annotations: Annotation[] }[] = [];
@@ -57,7 +71,7 @@ export function AnnotationList({
     }
     return result;
   }, [filtered, sections]);
-  const visibleKey = visiblePages.join(",");
+  const visibleKey = visibleAnnotationIds.join(",");
   useLayoutEffect(() => {
     const el = content.current;
     if (!el) return;
@@ -69,7 +83,7 @@ export function AnnotationList({
         setBounds(null);
         return;
       }
-      const top = Math.min(...rows.map((r) => r.offsetTop)) - 6;
+      const top = Math.min(...rows.map((r) => r.offsetTop)) - 4;
       const bottom =
         Math.max(...rows.map((r) => r.offsetTop + r.offsetHeight)) + 6;
       setBounds((old) =>
@@ -83,9 +97,16 @@ export function AnnotationList({
   }, [visibleKey, groups]);
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !bounds) return;
+    if (!el || !bounds || draft) return;
     const padding = 24;
-    if (bounds.bottom > el.scrollTop + el.clientHeight - padding)
+    if (bounds.bottom - bounds.top > el.clientHeight - padding * 2)
+      el.scrollTo({
+        top: Math.max(0, bounds.top - padding),
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
+    else if (bounds.bottom > el.scrollTop + el.clientHeight - padding)
       el.scrollTo({
         top: Math.max(0, bounds.bottom - el.clientHeight + padding),
         behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -99,7 +120,7 @@ export function AnnotationList({
           ? "instant"
           : "smooth",
       });
-  }, [bounds]);
+  }, [bounds, draft]);
   return (
     <aside className="annotation-list-panel" aria-label="Annotations list">
       <div className="list-filters">
@@ -141,37 +162,46 @@ export function AnnotationList({
                 top: bounds.top,
                 bottom: `calc(100% - ${bounds.bottom}px)`,
               }}
-            >
-              <span>IN VIEW</span>
-            </div>
+            ></div>
           )}
           {groups.map((group, i) => (
             <section className="annotation-group" key={`${group.title}-${i}`}>
               <h3
-                className={`list-section ${group.annotations.some((a) => visiblePages.includes(a.page)) ? "current" : ""}`}
-                data-in-view={visiblePages.includes(group.annotations[0].page)}
+                className={`list-section ${group.annotations.some((a) => visibleAnnotationIds.includes(a.id)) ? "current" : ""}`}
               >
                 {group.title}
               </h3>
               {group.annotations.map((a) => (
-                <button
+                <div
                   key={a.id}
-                  className={`list-row ${a.kind} ${a.id === active ? "active" : ""}`}
-                  data-in-view={visiblePages.includes(a.page)}
-                  onClick={() => onOpen(a)}
-                  aria-label={`${kindLabel[a.kind]} on page ${pageLabel(a.page, labels)}: ${a.body || a.quote}`}
-                  aria-pressed={a.id === active}
+                  className={`list-entry ${active === a.id ? "selected" : ""}`}
+                  data-in-view={visibleAnnotationIds.includes(a.id)}
                 >
-                  <i className={`signal ${a.kind}`} />
-                  <span className="list-page">
-                    p. {pageLabel(a.page, labels)}
-                  </span>
-                  <span className="list-quote">“{a.quote}”</span>
-                  {a.body && <span className="list-body">{a.body}</span>}
-                  {!a.rects.length && (
-                    <small className="location-note">Location not found</small>
+                  {visibleAnnotationIds.includes(a.id) &&
+                    !visibleAnnotationIds.includes(
+                      filtered[filtered.indexOf(a) - 1]?.id,
+                    ) && <div className="list-in-view-label">In view</div>}
+                  {draft?.id === a.id ? (
+                    <Composer
+                      draft={draft}
+                      onChange={onDraftChange}
+                      onTypeChange={onDraftTypeChange}
+                      onCancel={onDraftCancel}
+                      onSave={onDraftSave}
+                    />
+                  ) : (
+                    <AnnotationCard
+                      annotation={a}
+                      active={active === a.id}
+                      labels={labels}
+                      selectable
+                      showQuote
+                      onOpen={onOpen}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
                   )}
-                </button>
+                </div>
               ))}
             </section>
           ))}

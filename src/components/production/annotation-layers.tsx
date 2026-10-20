@@ -50,6 +50,8 @@ export function AnnotationCard({
   onEdit,
   onDelete,
   preview = false,
+  selectable = false,
+  showQuote = false,
 }: {
   annotation: Annotation;
   active?: boolean;
@@ -58,6 +60,8 @@ export function AnnotationCard({
   onEdit?: (annotation: Annotation) => void;
   onDelete?: (annotation: Annotation) => void;
   preview?: boolean;
+  selectable?: boolean;
+  showQuote?: boolean;
 }) {
   const [action, setAction] = useState<"menu" | "delete" | null>(null);
   const card = useRef<HTMLElement>(null);
@@ -104,7 +108,7 @@ export function AnnotationCard({
       window.removeEventListener("scroll", dismissMovedAnchor, true);
     };
   }, [action]);
-  const clickable = preview && Boolean(onOpen);
+  const clickable = (preview || selectable) && Boolean(onOpen);
   const Main = clickable ? "button" : "div";
   return (
     <article
@@ -144,7 +148,7 @@ export function AnnotationCard({
           buttons[next]?.focus();
         }
       }}
-      className={`annotation-card ${annotation.kind} ${active ? "active" : ""}`}
+      className={`annotation-card ${annotation.kind} ${active ? "active" : ""} ${showQuote ? "with-quote" : ""}`}
       data-actions-open={action !== null}
       data-card-id={preview ? undefined : annotation.id}
     >
@@ -172,6 +176,9 @@ export function AnnotationCard({
           </span>
           <span>Page {pageLabel(annotation.page, labels)}</span>
         </span>
+        {showQuote && annotation.quote && (
+          <span className="card-quote">“{annotation.quote}”</span>
+        )}
         {annotation.body && (
           <span className="card-body">{annotation.body}</span>
         )}
@@ -355,15 +362,15 @@ export function AnnotationPageLayer({
       .map((a) => ({ ...a, rects: mergeRects(a.rects) })),
   );
   const allCards =
-    focus || mode === "hidden"
-      ? located.filter((a) => a.id === peek)
-      : mode === "margin"
-        ? located
-        : [];
+    mode === "list"
+      ? []
+      : focus || mode === "hidden"
+        ? located.filter((a) => a.id === peek)
+        : located;
   const pageDraft = draft?.page === page && draft.rects.length ? draft : null;
   const cards = sortedAnnotations([
     ...allCards.filter((annotation) => annotation.id !== pageDraft?.id),
-    ...(pageDraft
+    ...(pageDraft && mode !== "list"
       ? [{ ...pageDraft, id: "draft", createdAt: "", updatedAt: "" }]
       : []),
   ]);
@@ -535,7 +542,7 @@ export function AnnotationPageLayer({
           />
         )}
       </div>
-      {placements.length > 0 && (
+      {mode !== "list" && placements.length > 0 && (
         <div
           className={`margin-column ${pageDraft ? "has-editor" : ""}`}
           ref={column}
@@ -571,8 +578,8 @@ export function AnnotationPageLayer({
                   <path
                     d={
                       Math.abs(source - target) < 0.5
-                        ? `M 2 ${from} L 40 ${from}`
-                        : `M 2 ${from} C 22.9 ${from} 19.1 ${to} 40 ${to}`
+                        ? `M 1 ${from} L 41 ${from}`
+                        : `M 1 ${from} C 22.9 ${from} 19.1 ${to} 41 ${to}`
                     }
                     pathLength="1"
                   />

@@ -35,7 +35,7 @@ import {
 } from "@/lib/reader-model";
 import { AnnotationPageLayer, EmptyAnnotations } from "./annotation-layers";
 import { AnnotationList } from "./annotation-list";
-import { type TextSelection } from "./annotating";
+import { SelectionToolbar, type TextSelection } from "./annotating";
 import { Navigation } from "./navigation";
 import { copyExport, ExportMenu, ViewMenu } from "./menus";
 import { Presence, Segmented, Shortcuts, Toast } from "./ui";
@@ -66,7 +66,9 @@ export default function Reader({ study: paper }: { study: Study }) {
   const [toast, setToast] = useState("");
   const [pageFilter, setPageFilter] = useState<number | null>(null);
   const [screenWidth, setScreenWidth] = useState(() => innerWidth);
-  const [visiblePages, setVisiblePages] = useState([saved.position.page]);
+  const [visibleAnnotationIds, setVisibleAnnotationIds] = useState<string[]>(
+    [],
+  );
   const [ready, setReady] = useState(false);
   const [animateProgress, setAnimateProgress] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -246,6 +248,49 @@ export default function Reader({ study: paper }: { study: Study }) {
     },
     [],
   );
+  const refreshVisibleAnnotations = useCallback(() => {
+    const root = viewport.current;
+    if (!root || !restored.current) return;
+    const top = root.scrollTop + 84;
+    const bottom = root.scrollTop + root.clientHeight;
+    const visible = savedRef.current.annotations
+      .filter((annotation) => {
+        const geometry = pageGeometry.current.find(
+          (p) => p.page === annotation.page,
+        );
+        return (
+          geometry &&
+          annotation.rects.some((rect) => {
+            const passageTop = geometry.top + rect.y * geometry.height;
+            return (
+              passageTop + rect.height * geometry.height > top &&
+              passageTop < bottom
+            );
+          })
+        );
+      })
+      .map((annotation) => annotation.id);
+    setVisibleAnnotationIds((previous) =>
+      previous.join(",") === visible.join(",") ? previous : visible,
+    );
+  }, []);
+  const changeDisplayMode = useCallback(
+    (next: AnnotationMode) => {
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
+      editorFocusFrame.current = null;
+      // Commit the display handoff in the triggering event, before a browser paint.
+      flushSync(() => {
+        setSaved((old) => ({ ...old, mode: next }));
+        setPeek(null);
+        setSelection(null);
+        setPageFilter(null);
+      });
+      window.getSelection()?.removeAllRanges();
+      refreshVisibleAnnotations();
+    },
+    [refreshVisibleAnnotations],
+  );
   // Page boxes have stable dimensions between layout changes. Cache document
   // coordinates rather than measuring every page on every animation frame.
   useLayoutEffect(() => {
@@ -264,13 +309,17 @@ export default function Reader({ study: paper }: { study: Study }) {
           height: rect.height,
         };
       });
+      refreshVisibleAnnotations();
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
     elements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [ready, width, paper.id]);
+  }, [ready, width, paper.id, refreshVisibleAnnotations]);
+  useLayoutEffect(() => {
+    refreshVisibleAnnotations();
+  }, [ready, width, mode, saved.annotations, refreshVisibleAnnotations]);
   function scroll() {
     if (jumpEndTimer.current) clearTimeout(jumpEndTimer.current);
     jumpEndTimer.current = setTimeout(finishJump, 120);
@@ -281,14 +330,8 @@ export default function Reader({ study: paper }: { study: Study }) {
       const root = viewport.current;
       if (!root || !restored.current) return;
       const top = root.scrollTop + 84;
-      const bottom = root.scrollTop + root.clientHeight;
       const pages = pageGeometry.current;
-      const visible = pages
-        .filter((p) => p.top + p.height > top && p.top < bottom)
-        .map((p) => p.page);
-      setVisiblePages((previous) =>
-        previous.join(",") === visible.join(",") ? previous : visible,
-      );
+      refreshVisibleAnnotations();
       const anchor = pages.find((p) => p.top + p.height > top) ?? pages.at(-1);
       if (!anchor) return;
       const fraction =
@@ -376,13 +419,10 @@ export default function Reader({ study: paper }: { study: Study }) {
       editorFocusFrame.current = requestAnimationFrame(() => {
         editorFocusFrame.current = null;
         window.getSelection()?.removeAllRanges();
-        viewport.current
-          ?.querySelector<HTMLButtonElement>(
-            `[data-card-id="${annotation.id}"] .card-add-note`,
-          )
+        document
+          .querySelector<HTMLButtonElement>(".selection-toolbar button")
           ?.focus({ preventScroll: true });
       });
-      announce("Highlight saved. Press slash to add a note or question.");
     },
     [announce],
   );
@@ -424,25 +464,34 @@ export default function Reader({ study: paper }: { study: Study }) {
   }, []);
   const focusEditor = useCallback(
     (annotation: Pick<Annotation, "page" | "rects">) => {
-      jump(
-        annotation.page,
-        Math.max(0, (annotation.rects[0]?.y ?? 0) - 0.15),
-        false,
-      );
+      if (mode !== "list")
+        jump(
+          annotation.page,
+          Math.max(0, (annotation.rects[0]?.y ?? 0) - 0.15),
+          false,
+        );
       if (editorFocusFrame.current !== null)
         cancelAnimationFrame(editorFocusFrame.current);
       let attempts = 0;
       const focusWhenMounted = () => {
         editorFocusFrame.current = null;
-        const textarea = viewport.current?.querySelector<HTMLTextAreaElement>(
-          `[data-page="${annotation.page}"] .inline-composer textarea`,
-        );
+        const textarea =
+          mode === "list"
+            ? document.querySelector<HTMLTextAreaElement>(
+                ".annotation-list-panel .inline-composer textarea",
+              )
+            : viewport.current?.querySelector<HTMLTextAreaElement>(
+                `[data-page="${annotation.page}"] .inline-composer textarea`,
+              );
         if (!textarea) {
           if (++attempts < 30)
             editorFocusFrame.current = requestAnimationFrame(focusWhenMounted);
           return;
         }
-        const root = viewport.current;
+        const root =
+          mode === "list"
+            ? document.querySelector<HTMLElement>(".list-scroll")
+            : viewport.current;
         const form = textarea.form;
         if (root && form) {
           const bounds = form.getBoundingClientRect();
@@ -461,7 +510,7 @@ export default function Reader({ study: paper }: { study: Study }) {
       };
       editorFocusFrame.current = requestAnimationFrame(focusWhenMounted);
     },
-    [jump],
+    [jump, mode],
   );
   const editAnnotation = useCallback(
     (annotation: Annotation) => {
@@ -486,7 +535,12 @@ export default function Reader({ study: paper }: { study: Study }) {
   );
   const deleteAnnotation = useCallback(
     (annotation: Annotation) => {
+      if (editorFocusFrame.current !== null)
+        cancelAnimationFrame(editorFocusFrame.current);
+      editorFocusFrame.current = null;
+      window.getSelection()?.removeAllRanges();
       flushSync(() => {
+        setSelection(null);
         setSaved((old) => ({
           ...old,
           annotations: old.annotations.filter(
@@ -497,10 +551,6 @@ export default function Reader({ study: paper }: { study: Study }) {
         }));
         setPeek((old) => (old === annotation.id ? null : old));
       });
-      clearSelection();
-      if (editorFocusFrame.current !== null)
-        cancelAnimationFrame(editorFocusFrame.current);
-      editorFocusFrame.current = null;
       announce(
         `${annotation.kind[0].toUpperCase() + annotation.kind.slice(1)} deleted`,
       );
@@ -663,8 +713,7 @@ export default function Reader({ study: paper }: { study: Study }) {
         toggleFocus();
       } else if (key === "m" || key === "l") {
         e.preventDefault();
-        setSaved((old) => ({ ...old, mode: key === "m" ? "margin" : "list" }));
-        setPageFilter(null);
+        changeDisplayMode(key === "m" ? "margin" : "list");
       } else if (key === "\\") {
         e.preventDefault();
         setSaved((old) => ({
@@ -839,11 +888,7 @@ export default function Reader({ study: paper }: { study: Study }) {
               { value: "list", label: "List" },
               { value: "hidden", label: "Hidden" },
             ]}
-            onChange={(next) => {
-              setSaved((old) => ({ ...old, mode: next }));
-              setPeek(null);
-              setPageFilter(null);
-            }}
+            onChange={changeDisplayMode}
           />
         </section>
       )}
@@ -889,19 +934,26 @@ export default function Reader({ study: paper }: { study: Study }) {
       >
         {documentView}
       </main>
-      <Presence open={!focus && mode === "list"}>
+      {!focus && mode === "list" && (
         <AnnotationList
           annotations={saved.annotations}
           sections={sections}
           labels={labels}
-          visiblePages={visiblePages}
+          visibleAnnotationIds={visibleAnnotationIds}
+          draft={saved.draft}
+          onDraftChange={changeDraft}
+          onDraftTypeChange={begin}
+          onDraftCancel={cancelDraft}
+          onDraftSave={saveDraft}
+          onEdit={editAnnotation}
+          onDelete={deleteAnnotation}
           page={saved.position.page}
           active={saved.active}
           pageFilter={pageFilter}
           onClearPageFilter={() => setPageFilter(null)}
           onOpen={openAnnotation}
         />
-      </Presence>
+      )}
       {!focus && mode === "margin" && saved.annotations.length === 0 && (
         <aside className="empty-margin">
           <EmptyAnnotations />
@@ -949,10 +1001,7 @@ export default function Reader({ study: paper }: { study: Study }) {
         <button
           className="pill"
           onClick={() =>
-            setSaved((old) => ({
-              ...old,
-              mode: old.mode === "list" ? "hidden" : "list",
-            }))
+            changeDisplayMode(saved.mode === "list" ? "hidden" : "list")
           }
         >
           Annotations
@@ -962,6 +1011,18 @@ export default function Reader({ study: paper }: { study: Study }) {
         <div className="storage-notice" role="alert">
           {storageError}
         </div>
+      )}
+      {selection && (
+        <SelectionToolbar
+          selection={selection}
+          onChoose={(kind) => {
+            if (kind === "highlight") return;
+            const annotation = saved.annotations.find(
+              (a) => a.id === saved.active,
+            );
+            if (annotation) editAnnotation({ ...annotation, kind });
+          }}
+        />
       )}
       <Toast message={toast} />
     </div>

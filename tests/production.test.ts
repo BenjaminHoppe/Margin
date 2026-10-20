@@ -456,6 +456,20 @@ test("cancelled and deleted editors leave no empty card or connector", () => {
   );
   assert.match(editing, /inline-composer/);
   assert.match(editing, /range-tick note/);
+  const listMode = renderToStaticMarkup(
+    createElement(AnnotationPageLayer, {
+      ...props,
+      mode: "list",
+      focus: true,
+      peek: annotation.id,
+      draft: { ...annotation, body: "Editing in the list", kind: "note" },
+    }),
+  );
+  assert.doesNotMatch(
+    listMode,
+    /margin-column|connector|inline-composer|annotation-card/,
+  );
+  assert.match(listMode, /draft-passage note/);
   const cancelled = renderToStaticMarkup(
     createElement(AnnotationPageLayer, { ...props, active: null }),
   );

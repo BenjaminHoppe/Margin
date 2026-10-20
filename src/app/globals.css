@@ -494,9 +494,12 @@ kbd {
 .pdf-message p {
   margin: 12px 0;
 }
+/* Blend the passage overlay as one surface. Per-fragment blend layers can
+   retain a stale painted highlight briefly when Safari removes a fragment. */
 .passages {
   position: absolute;
   inset: 0;
+  mix-blend-mode: multiply;
   pointer-events: none;
 }
 .passage,
@@ -504,7 +507,6 @@ kbd {
   position: absolute;
   z-index: 4;
   border-radius: 2px;
-  mix-blend-mode: multiply;
   pointer-events: none;
 }
 .passage.highlight {
@@ -1180,21 +1182,29 @@ kbd {
 .list-filters {
   display: flex;
   gap: 4px;
-  padding: 10px 11px 12px;
+  padding: 12px 8px;
   border-bottom: 1px solid var(--line);
   flex: none;
 }
 .filter-chip {
-  font-size: 11px;
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  font-size: 12px;
   border-radius: 999px;
   background: var(--surface-2);
-  padding: 5px 7px;
+  padding: 8px 6px;
   white-space: nowrap;
+  transition:
+    background 150ms var(--ease),
+    color 150ms var(--ease);
 }
 .filter-chip span {
-  font: 10px var(--font-mono);
-  color: var(--faint);
-  margin-left: 2px;
+  font: 11px var(--font-mono);
+  color: var(--muted);
 }
 .filter-chip.active {
   background: var(--text);
@@ -3158,4 +3168,157 @@ a[href] * {
   display: block;
   flex: none;
   stroke-width: 1.75;
+}
+
+/* List items keep the passage, annotation and actions in a single surface. */
+.annotation-list-panel .list-scroll {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.annotation-list-panel .list-content {
+  padding: 8px 12px 24px;
+}
+.list-entry {
+  position: relative;
+  margin: 0 0 8px;
+}
+.list-entry .annotation-card {
+  position: relative;
+  width: 100%;
+  box-shadow: none;
+  border-color: var(--line);
+  transition:
+    background 150ms var(--ease),
+    border-color 150ms var(--ease);
+}
+.list-entry .annotation-card.active {
+  background: color-mix(in srgb, var(--signal) 5%, var(--surface));
+  border-color: color-mix(in srgb, var(--signal) 28%, var(--line));
+  box-shadow: none;
+}
+.list-entry .card-main {
+  padding: 12px;
+  gap: 12px;
+}
+.card-quote {
+  display: block;
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.list-entry .annotation-card.active .card-quote {
+  border-color: var(--signal);
+}
+.list-entry .card-body {
+  line-height: 1.5;
+}
+.list-entry .inline-composer {
+  width: 100%;
+}
+.list-entry .card-add-note {
+  margin-top: 0;
+}
+.list-entry .card-main:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -3px;
+}
+.annotation-list-panel .list-section {
+  padding: 16px 4px 8px;
+  margin: 0;
+  color: var(--muted);
+  font: 500 13px/1.4 var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.annotation-list-panel .annotation-group:first-of-type .list-section {
+  padding-top: 4px;
+}
+.annotation-list-panel .list-section.current {
+  color: var(--text);
+}
+.annotation-list-panel .in-view-wrapper {
+  left: 6px;
+  right: 6px;
+  border-radius: 16px;
+  background: color-mix(in srgb, #9b805a 12%, var(--surface));
+  transition: none;
+}
+.list-in-view-label {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 4px;
+  color: color-mix(in srgb, var(--in-view) 80%, var(--text));
+  font: 500 11px var(--font-sans);
+}
+@media (hover: hover) {
+  .list-entry .card-main:hover {
+    background: color-mix(in srgb, var(--text) 3%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .list-entry .annotation-card {
+    transition: none;
+  }
+}
+
+.annotation-list-panel .card-meta > span:last-child {
+  color: var(--muted);
+}
+@media (hover: hover) {
+  .filter-chip:not(.active):hover {
+    background: var(--current-row);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter-chip {
+    transition: none;
+  }
+}
+
+/* A display mode owns its annotation surfaces, including during updates. */
+.mode-list .paper-viewport .margin-column {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: none !important;
+}
+
+/* Safari can retain composited margin layers while a masked scroller changes
+   modes. List owns a separate panel, so release the PDF mask in that mode. */
+.mode-list .paper-viewport {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.mode-list .paper-viewport .anchored-card,
+.mode-list .paper-viewport .connector {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Match the PDF header fade without masking the scrolling annotation layers. */
+.mode-list::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 84px;
+  z-index: 10;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--canvas) 0px,
+    var(--canvas) 28px,
+    color-mix(in srgb, var(--canvas) 95%, transparent) 38px,
+    color-mix(in srgb, var(--canvas) 76%, transparent) 48px,
+    color-mix(in srgb, var(--canvas) 45%, transparent) 60px,
+    color-mix(in srgb, var(--canvas) 16%, transparent) 72px,
+    transparent 84px
+  );
 }
