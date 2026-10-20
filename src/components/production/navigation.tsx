@@ -257,7 +257,7 @@ export function Navigation({
   const pointerStart = useRef<number | null>(null);
   const dragging = useRef(false);
   // One indicator travels across chapter boundaries instead of remounting in each segment.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (mode !== "map" || focus) return;
     const update = () => {
       const track = rail.current?.querySelector<HTMLElement>(
@@ -760,7 +760,8 @@ export function Navigation({
       <div className="navigation-footer">
         <span>{progress}%</span>
         <button
-          className="icon-button"
+          className="icon-button navigation-toggle"
+          aria-expanded={mode === "contents"}
           aria-label={mode === "map" ? "Open contents" : "Collapse contents"}
           title={
             mode === "map" ? "Open contents (\\)" : "Collapse contents (\\)"
@@ -770,11 +771,20 @@ export function Navigation({
             onMode(mode === "map" ? "contents" : "map");
           }}
         >
-          {mode === "map" ? (
+          <span
+            className="navigation-toggle-state"
+            data-visible={mode === "map"}
+            aria-hidden="true"
+          >
             <PanelLeft size={14} />
-          ) : (
+          </span>
+          <span
+            className="navigation-toggle-state"
+            data-visible={mode === "contents"}
+            aria-hidden="true"
+          >
             <ArrowLeftToLine size={14} />
-          )}
+          </span>
         </button>
       </div>
     </>

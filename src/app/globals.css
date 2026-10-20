@@ -2308,17 +2308,28 @@ button:not(.chapter-segment):not(.range-tick),
   width: 100%;
 }
 
-/* Stable layers prevent toggling from shifting or remounting the navigation. */
+/* Reveal the expanded surface from the rail without resizing its text layout.
+   Both modes stay mounted; each outgoing layer clears before the next enters. */
 .minimap-rail,
 .contents-surface {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateX(-6px);
+  transform: translateX(-8px);
+}
+.minimap-rail {
   transition:
-    opacity 90ms var(--ease),
-    transform 90ms var(--ease),
-    visibility 0s 90ms;
+    opacity 100ms ease-out,
+    transform 100ms ease-out,
+    visibility 0s 100ms;
+}
+.contents-surface {
+  clip-path: inset(0 calc(100% - 48px) 0 0 round 20px);
+  transition:
+    clip-path 140ms var(--ease),
+    opacity 140ms ease-out,
+    transform 140ms ease-out,
+    visibility 0s 140ms;
 }
 .document-navigation.is-map .minimap-rail,
 .document-navigation.is-contents .contents-surface {
@@ -2326,10 +2337,20 @@ button:not(.chapter-segment):not(.range-tick),
   visibility: visible;
   pointer-events: auto;
   transform: translateX(0);
+}
+.document-navigation.is-map .minimap-rail {
   transition:
-    opacity 180ms var(--ease) 90ms,
-    transform 180ms var(--ease) 90ms,
-    visibility 0s 90ms;
+    opacity 220ms ease-out 140ms,
+    transform 220ms var(--ease) 140ms,
+    visibility 0s 140ms;
+}
+.document-navigation.is-contents .contents-surface {
+  clip-path: inset(0 0 0 0 round 20px);
+  transition:
+    clip-path 260ms var(--ease) 100ms,
+    opacity 180ms ease-out 100ms,
+    transform 260ms var(--ease) 100ms,
+    visibility 0s 100ms;
 }
 .contents-surface {
   position: absolute;
@@ -2618,4 +2639,24 @@ a[href] * {
 .contents-title-ending {
   white-space: nowrap;
   display: inline-block;
+}
+
+.navigation-footer .navigation-toggle {
+  position: relative;
+}
+.navigation-toggle-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translateX(-2px);
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease-out;
+}
+.navigation-toggle-state[data-visible="true"] {
+  opacity: 1;
+  transform: translateX(0);
 }
